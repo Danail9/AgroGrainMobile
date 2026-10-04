@@ -8,17 +8,7 @@ What was actually built and what is left: [docs/implementation-notes.md](docs/im
 ## Run it on your phone (QR code, Expo Go)
 
 1. Install **Expo Go** from the App Store or Google Play.
-2. Start the portal on this machine, from `AgroGrain/` (needs its database and `.env`):
-
-   ```powershell
-   git checkout feat/mobile-api
-   npm run db:migrate:deploy   # applies the new SessionKind migration
-   npm run dev                 # listens on port 3000
-   ```
-
-   The portal must be reachable from the phone: same Wi-Fi, and allow Node through the
-   Windows firewall for private networks when prompted.
-3. Start the app, from `AgroMobile/`:
+2. Start the app, from `AgroMobile/`:
 
    ```powershell
    npm install
@@ -27,9 +17,33 @@ What was actually built and what is left: [docs/implementation-notes.md](docs/im
 
    Scan the QR code with the phone camera (iOS) or from inside Expo Go (Android).
 
-The app finds the portal by itself: it takes the address of the machine running `expo start`
-and uses port 3000. Override it with `EXPO_PUBLIC_API_URL` (for example
-`EXPO_PUBLIC_API_URL=https://app.agrograin.bg npm start`).
+### Which portal the app talks to
+
+By default the live portal. The address is set in the committed `.env`
+(`EXPO_PUBLIC_API_URL=https://www.agrograinhub.bg`), so a fresh clone works with no setup. It
+holds a public URL only: `EXPO_PUBLIC_` values are bundled into the app and visible to anyone
+who has it, so never put a secret in there. Note this is the **real** database: registering
+creates a real user.
+
+To use a portal running on your own PC instead:
+
+1. Start it from `AgroGrain/` against a **local** database, never the hosted one
+   (`npm run db:migrate:deploy`, then `npm run dev`). The phone must reach the PC: same Wi-Fi,
+   and allow Node through the Windows firewall for private networks.
+2. Copy `.env.local.example` to `.env.local` (not committed) and set your PC's LAN address as the
+   phone sees it, for example `EXPO_PUBLIC_API_URL=http://192.168.1.10:3000`.
+3. Restart with a cleared cache:
+
+   ```powershell
+   npm start -- --clear
+   ```
+
+**Always pass `--clear` after changing any `.env` file.** Metro caches the compiled value, and
+without it the app keeps using the previous address even though Expo reports loading the new
+file. With no `EXPO_PUBLIC_API_URL` at all the app falls back to guessing the address of the PC
+running `expo start` on port 3000, which fails when that PC has virtual network adapters.
+
+### Accounts
 
 The account needs an **active subscription** (admin-granted, or the platform "free access"
 setting) and the demo seed account is `demo@agrograin.bg` / `demo1234`. Without a plan the app
