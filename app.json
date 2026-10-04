@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "AgroGrain",
+    "slug": "agromobile",
+    "scheme": "agrograin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#f3f5f2",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "bg.agrograin.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "bg.agrograin.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#1b5c32",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#1b5c32",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200
+        }
+      ],
+      "expo-asset"
+    ]
+  }
+}
