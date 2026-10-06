@@ -47,3 +47,5 @@ export const STORE_URL =
 /** Public policy pages served by the portal; required by both stores. */
 export const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL ?? `${API_URL}/privacy`;
 export const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL ?? `${API_URL}/terms`;
+
+export const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";

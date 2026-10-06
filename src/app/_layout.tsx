@@ -1,4 +1,5 @@
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { StripeProvider } from "@stripe/stripe-react-native";
 import { SplashScreen, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -8,7 +9,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useVersion } from "@/api/queries";
 import { persistOptions, queryClient, watchConnectivity, watchGates } from "@/api/queryClient";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
-import { APP_VERSION, STORE_URL } from "@/config";
+import { APP_VERSION, STORE_URL, STRIPE_PUBLISHABLE_KEY } from "@/config";
 import { isUnsupported } from "@/lib/version";
 import { colors } from "@/theme/tokens";
 import { Button } from "@/ui/forms";
@@ -62,8 +63,13 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
         <AuthProvider>
-          <StatusBar style="dark" />
-          <Navigator />
+          <StripeProvider
+            publishableKey={STRIPE_PUBLISHABLE_KEY}
+            urlScheme="agrograin"
+          >
+            <StatusBar style="dark" />
+            <Navigator />
+          </StripeProvider>
         </AuthProvider>
       </PersistQueryClientProvider>
     </SafeAreaProvider>

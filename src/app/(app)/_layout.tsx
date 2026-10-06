@@ -1,14 +1,16 @@
 import { Stack } from "expo-router";
-import { View } from "react-native";
+import { useEffect } from "react";
+import { AppState, View } from "react-native";
+
 
 import { isApiError } from "@/api/client";
 import { useMe } from "@/api/queries";
 import { colors, space } from "@/theme/tokens";
-import { Button } from "@/ui/forms";
 import { GATE_COPY, Gate, SignOutButton } from "@/ui/Gate";
 import { ActivityTracker } from "@/ui/ActivityTracker";
 import { UpdateBanner } from "@/ui/UpdateBanner";
 import { PushRegistrar } from "@/ui/PushRegistrar";
+import { Paywall } from "@/ui/Paywall";
 import { ErrorState, Loading } from "@/ui/QueryBoundary";
 
 export const unstable_settings = { initialRouteName: "(tabs)" };
@@ -20,6 +22,15 @@ export const unstable_settings = { initialRouteName: "(tabs)" };
  */
 export default function AppLayout() {
   const me = useMe();
+  const refetchMe = me.refetch;
+
+  // Coming back from the Stripe checkout in the browser picks up the new plan.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refetchMe();
+    });
+    return () => sub.remove();
+  }, [refetchMe]);
 
   if (me.data === undefined) {
     if (me.isPending && me.fetchStatus !== "paused") {
@@ -73,20 +84,10 @@ export default function AppLayout() {
 
   if (!subscription.active) {
     return (
-      <Gate
-        icon="lock-closed-outline"
-        title={GATE_COPY.inactive.title}
-        message={GATE_COPY.inactive.message}
-        actions={
-          <>
-            <Button
-              title="Провери отново"
-              loading={me.isFetching}
-              onPress={() => void me.refetch()}
-            />
-            <SignOutButton />
-          </>
-        }
+      <Paywall
+        checking={me.isFetching}
+        onRefresh={() => void me.refetch()}
+        actions={<SignOutButton />}
       />
     );
   }
