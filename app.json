@@ -47,6 +47,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/withIosScene",
       "expo-secure-store",
       [
         "expo-splash-screen",
@@ -64,7 +65,8 @@
           "microphonePermission": "AgroGrain използва микрофона, за да можеш да задаваш въпроси с глас.",
           "speechRecognitionPermission": "AgroGrain използва разпознаване на реч, за да превърне гласа ти в текст."
         }
-      ]
+      ],
+      ["@stripe/stripe-react-native", { "enableGooglePay": false }]
     ]
   }
 }

@@ -44,6 +44,24 @@ export const subscriptionSchema = z.object({
   cancelAtPeriodEnd: z.boolean(),
 });
 
+export const checkoutSchema = z.object({
+  paymentIntentClientSecret: z.string(),
+});
+
+export const plansSchema = z.object({
+  tier: z.enum(["BASE", "TRADER"]),
+  tierLabel: z.string(),
+  features: z.array(z.string()),
+  plans: z.array(
+    z.object({
+      interval: z.enum(["MONTH", "YEAR"]),
+      priceCents: z.number().int(),
+      currency: z.string(),
+      suffix: z.string(),
+    }),
+  ),
+});
+
 export const notificationPrefsSchema = z.object({
   priceMove: z.boolean(),
   priceThreshold: z.number(),

@@ -9,6 +9,7 @@ import { z } from "zod";
 import { api } from "@/api/client";
 import {
   authResultSchema,
+  checkoutSchema,
   chatReplySchema,
   cropDetailSchema,
   cropInsightSchema,
@@ -21,6 +22,7 @@ import {
   newsListSchema,
   notificationPrefsSchema,
   notificationsSchema,
+  plansSchema,
   offerDetailSchema,
   regionsSchema,
   tradeResponseSchema,
@@ -359,3 +361,17 @@ export type ChatTurn = { role: "user" | "assistant"; content: string };
 /** One assistant turn. Not cached: a conversation is not server state. */
 export const sendChat = (messages: ChatTurn[]) =>
   api("/ai/chat", { method: "POST", body: { messages }, schema: chatReplySchema });
+
+/** Starts a Stripe subscription server-side and returns what the PaymentSheet needs. */
+export const useStartCheckout = () =>
+  useMutation({
+    mutationFn: (plan: { interval: "MONTH" | "YEAR" }) =>
+      api("/subscription/checkout", { method: "POST", body: plan, schema: checkoutSchema }),
+  });
+
+export const usePlans = () =>
+  useQuery({
+    queryKey: ["plans"] as const,
+    queryFn: ({ signal }) => api("/subscription/plans", { schema: plansSchema, signal }),
+    staleTime: HOUR,
+  });
