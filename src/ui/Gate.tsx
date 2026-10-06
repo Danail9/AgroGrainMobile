@@ -37,7 +37,7 @@ export const GATE_COPY = {
  * A full-screen notice that stands in for the app: an inactive plan, a plan
  * tier without the exchange, an admin account.
  *
- * Reader-app rule: these screens only say what is wrong. They show no price,
+ * Note: the inactive gate is replaced by the paywall (Paywall.tsx); the rest only say what is wrong. They show no price,
  * no plan comparison, no purchase button and no link to buy anything. Apple
  * (guideline 3.1.1) and Google Play reject apps that sell digital access
  * outside their own billing, so softening this copy later risks the listing.

@@ -45,19 +45,32 @@ export const subscriptionSchema = z.object({
 });
 
 export const checkoutSchema = z.object({
-  paymentIntentClientSecret: z.string(),
+  /** Null when an active plan was changed on the saved card: nothing to pay in the sheet. */
+  paymentIntentClientSecret: z.string().nullable(),
 });
 
 export const plansSchema = z.object({
-  tier: z.enum(["BASE", "TRADER"]),
-  tierLabel: z.string(),
-  features: z.array(z.string()),
+  /** The tier that matches the account type; the screen highlights it. */
+  recommendedTier: z.enum(["BASE", "TRADER"]),
+  current: z
+    .object({
+      interval: z.enum(["MONTH", "YEAR"]),
+      tier: z.enum(["BASE", "TRADER"]),
+      currentPeriodEnd: isoDate.nullable(),
+      cancelAtPeriodEnd: z.boolean(),
+      managedByAdmin: z.boolean(),
+    })
+    .nullable(),
   plans: z.array(
     z.object({
       interval: z.enum(["MONTH", "YEAR"]),
+      tier: z.enum(["BASE", "TRADER"]),
+      name: z.string(),
       priceCents: z.number().int(),
-      currency: z.string(),
       suffix: z.string(),
+      savingCents: z.number().int().nullable(),
+      features: z.array(z.string()),
+      tradeFeatures: z.array(z.string()),
     }),
   ),
 });

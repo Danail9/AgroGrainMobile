@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { View } from "react-native";
 
 import { useMe } from "@/api/queries";
@@ -85,6 +86,12 @@ export default function SettingsScreen() {
               <AppText variant="caption" tone="muted">
                 {subscriptionLabel(subscription)}
               </AppText>
+              <Button
+                title="Планове и плащане"
+                variant="secondary"
+                compact
+                onPress={() => router.push("/subscription")}
+              />
             </Card>
 
             <Card style={{ gap: 4 }}>

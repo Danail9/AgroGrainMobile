@@ -362,10 +362,10 @@ export type ChatTurn = { role: "user" | "assistant"; content: string };
 export const sendChat = (messages: ChatTurn[]) =>
   api("/ai/chat", { method: "POST", body: { messages }, schema: chatReplySchema });
 
-/** Starts a Stripe subscription server-side and returns what the PaymentSheet needs. */
+/** Buys or changes a plan server-side; returns what the PaymentSheet needs (null: charged on the saved card). */
 export const useStartCheckout = () =>
   useMutation({
-    mutationFn: (plan: { interval: "MONTH" | "YEAR" }) =>
+    mutationFn: (plan: { interval: "MONTH" | "YEAR"; tier: "BASE" | "TRADER" }) =>
       api("/subscription/checkout", { method: "POST", body: plan, schema: checkoutSchema }),
   });
 

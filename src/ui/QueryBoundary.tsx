@@ -21,11 +21,13 @@ export function Loading() {
 export function ErrorState({
   message,
   onRetry,
+  retryLabel = "Опитай отново",
   icon = "alert-circle-outline",
   title = "Нещо се обърка",
 }: {
   message: string;
   onRetry?: () => void;
+  retryLabel?: string;
   icon?: IconName;
   title?: string;
 }) {
@@ -40,7 +42,7 @@ export function ErrorState({
           {message}
         </AppText>
       </View>
-      {onRetry ? <Button title="Опитай отново" onPress={onRetry} variant="secondary" compact /> : null}
+      {onRetry ? <Button title={retryLabel} onPress={onRetry} variant="secondary" compact /> : null}
     </Card>
   );
 }

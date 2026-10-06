@@ -43,8 +43,7 @@ export default function TradeScreen() {
   const trade = useTrade();
   const me = useMe();
 
-  // The plan is active but does not include the exchange. Text only: this is a
-  // reader app, so there is no price, plan comparison or way to buy here.
+  // The plan is active but does not include the exchange: offer the plans.
   const locked = isApiError(trade.error) && trade.error.code === "trade_access";
 
   return (
@@ -60,6 +59,8 @@ export default function TradeScreen() {
           icon="lock-closed-outline"
           title="Борсата не е включена"
           message="Този раздел не е включен в плана ти."
+          retryLabel="Планове"
+          onRetry={() => router.push("/subscription")}
         />
       ) : (
         <QueryBoundary query={trade}>{(data) => <TradeTabs data={data} />}</QueryBoundary>
