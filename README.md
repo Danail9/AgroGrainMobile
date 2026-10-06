@@ -8,9 +8,9 @@ What was actually built and what is left: [docs/implementation-notes.md](docs/im
 ## Run it on your phone (QR code, Expo Go)
 
 1. Install **Expo Go** from the App Store or Google Play.
-2. Start the app, from `AgroMobile/`:
+2. Start the app, from `app-mobile/`:
 
-   ```powershell
+   ```bash
    npm install
    npm start
    ```
@@ -27,14 +27,14 @@ creates a real user.
 
 To use a portal running on your own PC instead:
 
-1. Start it from `AgroGrain/` against a **local** database, never the hosted one
+1. Start it from `app-web/` against a **local** database, never the hosted one
    (`npm run db:migrate:deploy`, then `npm run dev`). The phone must reach the PC: same Wi-Fi,
-   and allow Node through the Windows firewall for private networks.
+   and allow Node through your firewall for private networks (on Windows: the private-network rule).
 2. Copy `.env.local.example` to `.env.local` (not committed) and set your PC's LAN address as the
    phone sees it, for example `EXPO_PUBLIC_API_URL=http://192.168.1.10:3000`.
 3. Restart with a cleared cache:
 
-   ```powershell
+   ```bash
    npm start -- --clear
    ```
 
@@ -51,8 +51,18 @@ shows a text-only gate, by design (see below).
 
 ### If `expo start` crashes when the phone connects
 
-`metro.config.js` already limits Metro to one worker, which fixes a native crash seen on
-Windows. If you still see a segmentation fault, run `npx expo start --clear` once.
+`metro.config.js` already limits Metro to one worker on Windows, which fixes a native crash seen
+there. If you still see a segmentation fault, run `npx expo start --clear` once.
+
+### Optional environment
+
+| Variable | Purpose |
+|---|---|
+| `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL` | Policy pages linked from register and settings (hidden when unset) |
+| `EXPO_PUBLIC_IOS_STORE_URL` | App Store link for the forced-upgrade screen |
+
+Push notifications and voice input are native: they need a development build
+(`npx expo run:ios|android` or `eas build --profile development`), not Expo Go.
 
 ## Scripts
 
@@ -80,7 +90,7 @@ src/theme/      colour, spacing and type tokens from the portal's globals.css
 - **Reader app.** The app never shows a price, a plan comparison or a way to buy. Gates only say
   what is wrong. Apple (3.1.1) and Google Play reject apps that sell digital access outside their
   own billing. The wording lives in `GATE_COPY` and is asserted by tests.
-- **`src/api/schemas.ts` is a copy** of `AgroGrain/lib/api/schemas.ts`. Edit the portal's file
+- **`src/api/schemas.ts` is a copy** of `app-web/lib/api/schemas.ts`. Edit the portal's file
   and copy it here; `npm run check:contract` fails if they differ.
 - **One phone per account.** The portal allows one browser session and one phone session. A
   second phone is refused until the first signs out or an admin approves it.

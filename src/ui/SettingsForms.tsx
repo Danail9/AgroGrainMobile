@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Switch, View } from "react-native";
+import { Alert, Switch, View } from "react-native";
 
 import { isApiError } from "@/api/client";
 import {
   changePassword,
+  deleteAccount,
   useRegions,
   useUpdatePrefs,
   useUpdateProfile,
@@ -13,6 +14,7 @@ import type { Me } from "@/api/schemas";
 import { useAuth } from "@/auth/AuthContext";
 import { normalizeDecimal } from "@/lib/forms";
 import { PHONE_CODES, splitPhone } from "@/lib/phone";
+import { disablePush, enablePush, pushSupported } from "@/lib/push";
 import { colors, space } from "@/theme/tokens";
 import { Button, ChoiceGroup, FormMessage, TextField } from "@/ui/forms";
 import { Divider } from "@/ui/primitives";
@@ -158,6 +160,77 @@ export function PasswordForm() {
   );
 }
 
+/** Required by the stores: the account can be erased from inside the app. */
+export function DeleteAccountForm() {
+  const { signOut } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fields, setFields] = useState<Errors>({});
+
+  async function erase() {
+    setBusy(true);
+    setError(null);
+    setFields({});
+    try {
+      await deleteAccount({ password });
+      await signOut();
+    } catch (e) {
+      const f = failure(e, ["password"]);
+      setError(f.form ?? null);
+      setFields(f.field ?? {});
+      setBusy(false);
+    }
+  }
+
+  function confirm() {
+    Alert.alert(
+      "Изтриване на профила",
+      "Профилът и всички твои данни ще бъдат изтрити окончателно. Това не може да се върне.",
+      [
+        { text: "Отказ", style: "cancel" },
+        { text: "Изтрий", style: "destructive", onPress: () => void erase() },
+      ],
+    );
+  }
+
+  if (!open) {
+    return (
+      <View style={{ gap: space.md }}>
+        <AppText variant="caption" tone="muted">
+          Изтрива профила ти и всичките му данни окончателно.
+        </AppText>
+        <Button title="Изтрий профила" variant="danger" icon="trash-outline" onPress={() => setOpen(true)} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ gap: space.md }}>
+      <FormMessage error={error} success={null} />
+      <TextField
+        label="Паролата ти"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+        autoCapitalize="none"
+        placeholder="••••••••"
+        error={fields.password}
+      />
+      <Button
+        title="Изтрий профила окончателно"
+        variant="danger"
+        icon="trash-outline"
+        loading={busy}
+        disabled={!password}
+        onPress={confirm}
+      />
+      <Button title="Отказ" variant="secondary" disabled={busy} onPress={() => setOpen(false)} />
+    </View>
+  );
+}
+
 function Toggle({
   label,
   hint,
@@ -192,8 +265,8 @@ function Toggle({
 
 /**
  * Alert preferences. Each switch saves on its own; the threshold saves from
- * its button. The device-push switch is left out: push delivery is not part
- * of this version of the app.
+ * its button. The phone-alerts switch only appears in builds that can receive
+ * push (not Expo Go).
  */
 export function NotificationPrefsForm({ prefs }: { prefs: Me["notificationPrefs"] }) {
   const update = useUpdatePrefs();
@@ -210,9 +283,36 @@ export function NotificationPrefsForm({ prefs }: { prefs: Me["notificationPrefs"
     });
   };
 
+  async function setPush(push: boolean) {
+    setError(null);
+    setSuccess(null);
+    try {
+      if (push && !(await enablePush())) {
+        setError("Разреши известията за AgroGrain от настройките на телефона.");
+        return;
+      }
+      if (!push) await disablePush();
+    } catch {
+      setError("Известията на телефона не могат да се променят в момента.");
+      return;
+    }
+    save({ push }, "Настройките са запазени.");
+  }
+
   return (
     <View>
       <FormMessage error={error} success={success} />
+      {pushSupported() ? (
+        <>
+          <Toggle
+            label="Известия на телефона"
+            hint="Получавай алармите като известия, дори когато приложението е затворено."
+            value={prefs.push}
+            onChange={(push) => void setPush(push)}
+          />
+          <Divider />
+        </>
+      ) : null}
       <Toggle
         label="Промяна в цените"
         hint="Когато дневната промяна надвиши прага по-долу."

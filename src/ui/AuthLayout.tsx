@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -9,24 +10,16 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, space } from "@/theme/tokens";
-import { Icon } from "@/ui/Icon";
 import { AppText } from "@/ui/Text";
 
 export function Logo({ size = 56 }: { size?: number }) {
   return (
-    <View
+    <Image
       accessibilityLabel="AgroGrain"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size * 0.3,
-        backgroundColor: colors.brand[700],
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <Icon name="leaf" size={size * 0.55} color={colors.white} />
-    </View>
+      source={require("../../assets/logo.png")}
+      style={{ width: size, height: size * (514 / 593) }}
+      resizeMode="contain"
+    />
   );
 }
 

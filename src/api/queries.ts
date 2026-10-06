@@ -248,6 +248,17 @@ export const useUpdatePrefs = () =>
 export const changePassword = (input: { current: string; password: string; confirm: string }) =>
   api("/me/password", { method: "POST", body: input, schema: authResultSchema });
 
+/** Tells the portal which phone to send alerts to. */
+export const registerPushToken = (token: string) =>
+  api("/me/push-token", { method: "POST", body: { token }, schema: ok });
+
+export const removePushToken = (token: string) =>
+  api("/me/push-token", { method: "DELETE", body: { token }, schema: ok });
+
+/** Permanently deletes the account after re-checking the password. */
+export const deleteAccount = (input: { password: string }) =>
+  api("/me", { method: "DELETE", body: input, schema: ok });
+
 export type OfferInput = {
   category: "CROP" | "FERTILIZER" | "SEED";
   title: string;

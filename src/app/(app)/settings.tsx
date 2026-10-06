@@ -8,7 +8,14 @@ import { Button } from "@/ui/forms";
 import { Card } from "@/ui/primitives";
 import { QueryBoundary } from "@/ui/QueryBoundary";
 import { Screen } from "@/ui/Screen";
-import { NotificationPrefsForm, PasswordForm, ProfileForm, RegionForm } from "@/ui/SettingsForms";
+import { LegalLinks } from "@/ui/LegalLinks";
+import {
+  DeleteAccountForm,
+  NotificationPrefsForm,
+  PasswordForm,
+  ProfileForm,
+  RegionForm,
+} from "@/ui/SettingsForms";
 import { AppText } from "@/ui/Text";
 
 export default function SettingsScreen() {
@@ -95,6 +102,15 @@ export default function SettingsScreen() {
             </Card>
 
             <Button title="Изход от профила" variant="danger" icon="log-out-outline" onPress={() => void signOut()} />
+
+            <Card style={{ gap: space.md }}>
+              <AppText variant="small" bold>
+                Изтриване на профила
+              </AppText>
+              <DeleteAccountForm />
+            </Card>
+
+            <LegalLinks />
           </>
         )}
       </QueryBoundary>

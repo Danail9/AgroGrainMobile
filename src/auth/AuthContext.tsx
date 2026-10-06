@@ -13,6 +13,7 @@ import {
 import { api, configureApi, type Session } from "@/api/client";
 import { clearCache } from "@/api/queryClient";
 import { authResultSchema } from "@/api/schemas";
+import { disablePush } from "@/lib/push";
 import { z } from "zod";
 
 const SESSION_KEY = "ag.session";
@@ -149,6 +150,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     const token = sessionRef.current?.token;
+    // The phone must stop receiving this account's alerts. Needs the live
+    // session, so it runs first, but never keeps the user waiting long.
+    await Promise.race([
+      disablePush().catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]);
     // Tell the server in the background; the user should never wait on it.
     if (token) {
       void api("/auth/logout", {

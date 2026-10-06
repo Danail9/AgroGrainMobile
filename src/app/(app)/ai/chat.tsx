@@ -1,15 +1,19 @@
 import { useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 
 import { isApiError } from "@/api/client";
 import { sendChat, type ChatTurn } from "@/api/queries";
 import { SUGGESTIONS } from "@/lib/ai";
+import { voiceSupported } from "@/lib/voice";
 import { colors, radius, space } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { Card, pressedStyle } from "@/ui/primitives";
 import { Screen } from "@/ui/Screen";
 import { AppText } from "@/ui/Text";
+
+// Native speech module: only requested in builds that contain it, never in Expo Go.
+const VoiceButton = voiceSupported ? lazy(() => import("@/ui/VoiceButton")) : null;
 
 /** What the assistant says when it cannot answer; the same wording as the web. */
 function failureReply(error: unknown) {
@@ -26,6 +30,7 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<ChatTurn[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
+  const [voiceMessage, setVoiceMessage] = useState<string | null>(null);
   const scroll = useRef<ScrollView>(null);
   const started = useRef(false);
 
@@ -122,6 +127,11 @@ export default function ChatScreen() {
         )}
       </ScrollView>
 
+      {voiceMessage ? (
+        <AppText variant="caption" tone="muted" style={{ paddingBottom: 6 }} accessibilityRole="alert">
+          {voiceMessage}
+        </AppText>
+      ) : null}
       <View style={styles.inputBar}>
         <TextInput
           accessibilityLabel="Въпрос към AgroGrain AI"
@@ -136,6 +146,11 @@ export default function ChatScreen() {
           blurOnSubmit
           onSubmitEditing={() => void send(input)}
         />
+        {VoiceButton ? (
+          <Suspense fallback={null}>
+            <VoiceButton onText={setInput} onError={setVoiceMessage} disabled={pending} />
+          </Suspense>
+        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Изпрати"

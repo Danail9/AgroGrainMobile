@@ -1,11 +1,12 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react-native";
-import { Text } from "react-native";
+import { Alert, Text } from "react-native";
 
 import { ApiClientError } from "@/api/client";
 import { GATE_COPY, Gate } from "@/ui/Gate";
 import { ChangeBadge, Pill, SampleSpecs, UnreadBadge } from "@/ui/primitives";
 import { QueryBoundary } from "@/ui/QueryBoundary";
+import { DeleteAccountForm } from "@/ui/SettingsForms";
 
 jest.mock("expo-router", () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
@@ -147,5 +148,23 @@ describe("primitives", () => {
   it("Pill renders its label", async () => {
     await render(<Pill tone="brand">Активна</Pill>);
     expect(screen.getByText("Активна")).toBeTruthy();
+  });
+});
+
+describe("DeleteAccountForm", () => {
+  it("stays collapsed until asked, then needs the password before it can be used", async () => {
+    await render(<DeleteAccountForm />);
+    expect(screen.queryByText("Паролата ти")).toBeNull();
+
+    await fireEvent.press(screen.getByText("Изтрий профила"));
+    expect(screen.getByText("Паролата ти")).toBeTruthy();
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+    await fireEvent.press(screen.getByText("Изтрий профила окончателно"));
+    expect(alert).not.toHaveBeenCalled();
+
+    await fireEvent.changeText(screen.getByPlaceholderText("••••••••"), "secret123");
+    await fireEvent.press(screen.getByText("Изтрий профила окончателно"));
+    expect(alert).toHaveBeenCalledTimes(1);
+    alert.mockRestore();
   });
 });

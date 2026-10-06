@@ -13,17 +13,37 @@
       "bundleIdentifier": "bg.agrograin.mobile",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "associatedDomains": [
+        "applinks:www.agrograinhub.bg"
+      ]
     },
     "android": {
       "package": "bg.agrograin.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#1b5c32",
+        "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "www.agrograinhub.bg",
+              "pathPrefix": "/reset-password"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "plugins": [
       "expo-router",
@@ -31,12 +51,20 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#1b5c32",
+          "backgroundColor": "#ffffff",
           "image": "./assets/splash-icon.png",
           "imageWidth": 200
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-notifications",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "AgroGrain използва микрофона, за да можеш да задаваш въпроси с глас.",
+          "speechRecognitionPermission": "AgroGrain използва разпознаване на реч, за да превърне гласа ти в текст."
+        }
+      ]
     ]
   }
 }

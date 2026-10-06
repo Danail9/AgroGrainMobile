@@ -2,7 +2,7 @@
  * Contract check: does a running AgroGrain portal still answer the way this
  * app expects?
  *
- *   1. If the portal source sits next to this repo, the schema copy in
+ *   1. If the portal source sits next to this repo (../app-web, or PORTAL_DIR), the schema copy in
  *      src/api/schemas.ts must be byte-identical to lib/api/schemas.ts there.
  *   2. Signs in with a real account and validates every GET endpoint's
  *      response against the schemas the app ships with.
@@ -34,7 +34,11 @@ function report(ok: boolean, name: string, detail = "") {
 }
 
 function checkSchemaCopy() {
-  const source = path.resolve(__dirname, "../../AgroGrain/lib/api/schemas.ts");
+  const source = path.resolve(
+    __dirname,
+    process.env.PORTAL_DIR ?? "../../app-web",
+    "lib/api/schemas.ts",
+  );
   const copy = path.resolve(__dirname, "../src/api/schemas.ts");
   if (!existsSync(source)) {
     console.log("  --   schema copy: portal source not found next to this repo, skipped");

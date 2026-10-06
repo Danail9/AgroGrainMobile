@@ -5,6 +5,9 @@ import { SECTION_STYLE, WEATHER_ICONS } from "@/lib/icons";
 import { averagePrice, changeSentence, latestDay, strongestSignal } from "@/lib/market";
 import { NOTIFICATION_ICONS, internalPath } from "@/lib/notifications";
 import { planName, subscriptionLabel } from "@/lib/plans";
+import { pushSupported } from "@/lib/push";
+import { compareVersions, isUnsupported, updateAvailable } from "@/lib/version";
+import { voiceError } from "@/lib/voice";
 import { describeSoilMoisture, riskTone, riskyHours, weatherSummary } from "@/lib/weather";
 
 describe("plans", () => {
@@ -169,5 +172,39 @@ describe("icon names exist in the bundled icon set", () => {
 
   it.each([...new Set(names)])("%s", (name) => {
     expect(glyphs[name]).toBeDefined();
+  });
+});
+
+describe("version gate", () => {
+  it("compares numerically, not as text", () => {
+    expect(compareVersions("1.10.0", "1.9.0")).toBeGreaterThan(0);
+    expect(compareVersions("1.0", "1.0.0")).toBe(0);
+    expect(compareVersions("0.9.9", "1.0.0")).toBeLessThan(0);
+  });
+
+  it("flags only builds older than the minimum", () => {
+    expect(isUnsupported("1.0.0", "1.0.0")).toBe(false);
+    expect(isUnsupported("1.2.0", "1.0.0")).toBe(false);
+    expect(isUnsupported("1.0.0", "1.1.0")).toBe(true);
+  });
+
+  it("reports a newer published build", () => {
+    expect(updateAvailable("1.0.0", "1.1.0")).toBe(true);
+    expect(updateAvailable("1.1.0", "1.1.0")).toBe(false);
+  });
+
+  it("treats a malformed version as 0 rather than throwing", () => {
+    expect(isUnsupported("1.0.0", "abc")).toBe(false);
+  });
+});
+
+describe("push and voice helpers", () => {
+  it("push stays off without an EAS project id", () => {
+    expect(pushSupported()).toBe(false);
+  });
+
+  it("maps speech errors to Bulgarian, with a safe fallback", () => {
+    expect(voiceError("not-allowed")).toMatch(/микрофона/);
+    expect(voiceError("something-new")).toBe("Гласовото въвеждане не е налично в момента.");
   });
 });

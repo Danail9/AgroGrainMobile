@@ -10,6 +10,7 @@ import { colors, radius, space } from "@/theme/tokens";
 import { AuthLayout } from "@/ui/AuthLayout";
 import { Button, ChoiceGroup, FormMessage, TextField } from "@/ui/forms";
 import { Icon, type IconName } from "@/ui/Icon";
+import { LegalLinks } from "@/ui/LegalLinks";
 import { RegionPicker, type RegionValue } from "@/ui/RegionPicker";
 import { AppText } from "@/ui/Text";
 
@@ -214,6 +215,11 @@ export default function RegisterScreen() {
             disabled={!name || !email.trim() || !password}
           />
         </View>
+
+        <AppText variant="caption" tone="muted" align="center">
+          Със създаването на профил приемаш Общите условия и Политиката за поверителност.
+        </AppText>
+        <LegalLinks />
 
         <View style={{ alignItems: "center", paddingTop: space.sm }}>
           <AppText variant="caption" tone="muted">

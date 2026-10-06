@@ -6,6 +6,9 @@ import { useMe } from "@/api/queries";
 import { colors, space } from "@/theme/tokens";
 import { Button } from "@/ui/forms";
 import { GATE_COPY, Gate, SignOutButton } from "@/ui/Gate";
+import { ActivityTracker } from "@/ui/ActivityTracker";
+import { UpdateBanner } from "@/ui/UpdateBanner";
+import { PushRegistrar } from "@/ui/PushRegistrar";
 import { ErrorState, Loading } from "@/ui/QueryBoundary";
 
 export const unstable_settings = { initialRouteName: "(tabs)" };
@@ -89,8 +92,13 @@ export default function AppLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <>
+      <UpdateBanner />
+      <ActivityTracker />
+      <PushRegistrar enabled={me.data.notificationPrefs.push} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+    </>
   );
 }

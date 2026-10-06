@@ -14,7 +14,8 @@ The spec is the intent; this file is what exists.
 | 3 Core farmer app | Done. Home, weather (4 tabs), market (+ fertilisers), crop detail, news, profile, notifications. |
 | 4 Борса | Done. Offers, listings, create/edit/delete, role-gated contacts, sample specs. |
 | 5 AI | Done except **voice input**. Chat, daily/weekly briefings, weather and market analysis, calculators. |
-| 6 Hardening | Partly. Contract check and tests done. **Not done:** accessibility audit on device, Maestro E2E, store assets, EAS submit, reset-password deep link. |
+| 6 Hardening | Partly. Contract check and tests done. **Not done:** accessibility audit on device, Maestro E2E, store assets and listing, EAS project id and submit, universal-link hosting files. |
+| 7 Gap closing (this pass) | Code done, **unverified on a device**: forced-upgrade gate, screen-view tracking, in-app account deletion, reset-password screen, push notifications, voice input, `eas.json`. See below. |
 
 ## Verified, and how
 
@@ -61,19 +62,32 @@ Server-side behaviour changes beyond new routes:
   count per account across both clients.
 - The admin session list labels each session "Приложение" or "Браузър".
 
+## Added after the first pass
+
+Code is in place and covered by unit tests where the logic is pure; none of it has run on a device.
+
+| Feature | Where | Needs before it works |
+|---|---|---|
+| Forced upgrade | `src/lib/version.ts`, gate in `src/app/_layout.tsx`, `GATE_COPY.update` | `MOBILE_MIN_VERSION` / `MOBILE_LATEST_VERSION` on the portal; `EXPO_PUBLIC_IOS_STORE_URL` for the iOS button. Fails open when offline. A dismissible banner (`UpdateBanner`) shows when `latestAppVersion` is newer. |
+| Screen-view tracking | `src/ui/ActivityTracker.tsx` → `POST /api/v1/activity` | Nothing. Paths only, no query strings. Admin "active today" and top pages now include phone users. |
+| Account deletion | Settings → "Изтриване на профила" → `DELETE /api/v1/me {password}` | Cancels a Stripe subscription first; refuses admins. Stripe keeps its own invoice records. |
+| Legal links | `src/ui/LegalLinks.tsx` (settings, register, consent line) → portal `/privacy` and `/terms` (`app-web/app/(legal)`) | Have the texts reviewed by a lawyer; set `SUPPORT_EMAIL` on the portal for the contact line. Override URLs with `EXPO_PUBLIC_PRIVACY_URL` / `EXPO_PUBLIC_TERMS_URL`. |
+| Reset password in app | `src/app/(auth)/reset-password.tsx`, `agrograin://reset-password?token=…` | The portal serves `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` (public in `proxy.ts`), but each answers 404 until `APPLE_TEAM_ID` and `ANDROID_CERT_SHA256` (comma-separated) are set on the portal. `app.json` already declares the domain. |
+| Push notifications | `src/lib/push.ts`, `PushRegistrar`, `POST/DELETE /api/v1/me/push-token`, `lib/expo-push.ts`, migration `20261006120000_push_kind` | A development or store build, an EAS project id (`extra.eas.projectId`), APNs and FCM credentials (`google-services.json`). Optional `EXPO_ACCESS_TOKEN` on the portal. The settings switch only shows in such builds. The token is removed on sign-out. |
+| Voice input | `src/ui/VoiceButton.tsx`, `src/lib/voice.ts` | A development build (`expo-speech-recognition` is native). Hidden in Expo Go. |
+| EAS profiles | `eas.json` | `eas init` to create the project, then `eas build`. |
+| CI | `../.github/workflows/ci.yml` | Typecheck, lint, tests for both projects and a schema-copy drift check. Move it to the repo root if the repo is split. |
+
 ## Known issues and decisions to make
 
-1. **Metro crashes on this Windows machine with multiple workers** (Node segmentation fault,
+1. **Metro crashed on a Windows machine with multiple workers** (Node segmentation fault,
    exit 139 / 0xC0000005), on both Node 24 and Node 22. The first bundle request killed
-   `expo start`. `metro.config.js` sets `maxWorkers = 1`, which fixed it. The portal's
+   `expo start`. `metro.config.js` sets `maxWorkers = 1` on Windows only, which fixed it. The portal's
    `next build` crashes the same way on `master` ("Collecting page data"), so it looks
    machine-level (antivirus or a native module). Not diagnosed further.
-2. **Voice input** needs `expo-speech-recognition`, which is not in Expo Go. Build it in a
-   development build.
-3. **Push notifications** are deferred, as decided. The inbox, preferences and server-side
-   scan already work; delivery to the device does not. The push switch is hidden in settings.
-4. **Password reset** emails a web link. Opening it in the phone's browser works; handling it
-   inside the app needs a deep link and a verified domain.
+2. **Voice input** is built but needs a development build to run (see above).
+3. **Push notifications** are built (see above) but unverified: they need credentials and a development build. The switch is hidden in Expo Go.
+4. **Password reset** emails a web link. The in-app screen exists; opening the emailed link in the app needs the hosted universal-link files (see above). Until then the link opens the web page.
 5. **Reader-app rule**: gates carry no price, plan comparison or purchase link
    (`GATE_COPY` in `src/ui/Gate.tsx`, asserted in tests). Check the current App Store and Play
    wording again before submitting.

@@ -34,3 +34,16 @@ export const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
  */
 export const USER_AGENT = `AgroMobile/${APP_VERSION} (${Platform.OS === "ios" ? "iPhone" : "Android"})`;
 
+
+/**
+ * Where "Обнови" sends the user. Android's listing is derived from the package
+ * name; the App Store link needs the numeric app id, so it comes from the env.
+ */
+export const STORE_URL =
+  Platform.OS === "ios"
+    ? (process.env.EXPO_PUBLIC_IOS_STORE_URL ?? null)
+    : "https://play.google.com/store/apps/details?id=bg.agrograin.mobile";
+
+/** Public policy pages served by the portal; required by both stores. */
+export const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL ?? `${API_URL}/privacy`;
+export const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL ?? `${API_URL}/terms`;
