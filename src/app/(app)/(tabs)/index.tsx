@@ -1,8 +1,8 @@
 import { router } from "expo-router";
 import { Pressable, View } from "react-native";
 
-import { useHome, useMe } from "@/api/queries";
-import type { Home } from "@/api/schemas";
+import { useHome, useMe, useWeather } from "@/api/queries";
+import type { Home, WeatherResponse } from "@/api/schemas";
 import { formatLongDate, formatNumber, greeting } from "@/lib/format";
 import { colors, radius, space } from "@/theme/tokens";
 import { BriefingSections } from "@/ui/BriefingSections";
@@ -35,6 +35,7 @@ const LEVEL = {
 export default function HomeScreen() {
   const me = useMe();
   const home = useHome();
+  const weather = useWeather(home.data?.role === "FARMER");
   const firstName = me.data?.user.name.split(" ")[0] ?? "";
   const unread = home.data && "unreadCount" in home.data ? home.data.unreadCount : 0;
   const trader = me.data?.user.role === "TRADER";
@@ -50,13 +51,19 @@ export default function HomeScreen() {
       onRefresh={() => {
         void home.refetch();
         void me.refetch();
+        if (home.data?.role === "FARMER") void weather.refetch();
       }}
-      refreshing={home.isRefetching}
+      refreshing={home.isRefetching || weather.isRefetching}
     >
       <QueryBoundary query={home}>
         {(data) =>
           data.role === "FARMER" ? (
-            <FarmerView data={data} canTrade={me.data?.subscription.canTrade ?? false} />
+            <FarmerView
+              data={data}
+              canTrade={me.data?.subscription.canTrade ?? false}
+              liveWeather={weather.data?.weather}
+              weatherUnavailable={weather.isError && !weather.data}
+            />
           ) : data.role === "TRADER" ? (
             <TraderView data={data} />
           ) : null
@@ -66,19 +73,37 @@ export default function HomeScreen() {
   );
 }
 
-function FarmerView({ data, canTrade }: { data: FarmerHome; canTrade: boolean }) {
-  const { weather } = data;
-  const today = weather.today;
-  const work = weather.fieldWork;
+function FarmerView({
+  data,
+  canTrade,
+  liveWeather,
+  weatherUnavailable,
+}: {
+  data: FarmerHome;
+  canTrade: boolean;
+  liveWeather?: WeatherResponse["weather"];
+  weatherUnavailable: boolean;
+}) {
+  const homeWeather = data.weather;
+  const current = liveWeather?.current ?? homeWeather.current;
+  const today = liveWeather?.daily[0] ?? homeWeather.today;
+  const work = homeWeather.fieldWork;
   const showChange = data.prices.some((price) => price.changePct !== null);
   const level = work ? LEVEL[work.level] : null;
 
   return (
     <>
-      {weather.isFallback ? (
+      {liveWeather?.isFallback ?? homeWeather.isFallback ? (
         <Card style={{ backgroundColor: colors.amber50, borderColor: "#fde68a" }}>
           <AppText variant="small" tone="warn" bold>
             Показваме примерна прогноза — няма връзка с източника на данни за времето.
+          </AppText>
+        </Card>
+      ) : null}
+      {weatherUnavailable ? (
+        <Card style={{ backgroundColor: colors.amber50, borderColor: "#fde68a" }}>
+          <AppText variant="small" tone="warn" bold>
+            Не успяхме да обновим времето — показваме последните налични данни.
           </AppText>
         </Card>
       ) : null}
@@ -112,11 +137,11 @@ function FarmerView({ data, canTrade }: { data: FarmerHome; canTrade: boolean })
           </Pressable>
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
-            <WeatherGlyph icon={weather.current.condition.icon} size={44} />
+            <WeatherGlyph icon={current.condition.icon} size={44} />
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8 }}>
                 <AppText variant="hero" numeric>
-                  {Math.round(weather.current.temperature)}°C
+                  {Math.round(current.temperature)}°C
                 </AppText>
                 {today ? (
                   <AppText variant="small" tone="muted" bold numeric>
@@ -125,8 +150,8 @@ function FarmerView({ data, canTrade }: { data: FarmerHome; canTrade: boolean })
                 ) : null}
               </View>
               <AppText variant="caption" tone="muted" numberOfLines={1}>
-                {weather.current.condition.label} · усеща се{" "}
-                {Math.round(weather.current.apparentTemperature)}°
+                {current.condition.label} · усеща се{" "}
+                {Math.round(current.apparentTemperature)}°
               </AppText>
             </View>
           </View>
@@ -139,12 +164,12 @@ function FarmerView({ data, canTrade }: { data: FarmerHome; canTrade: boolean })
             />
             <StatChip
               icon={<Icon name="flag" size={15} color={colors.slate} />}
-              value={`${Math.round(weather.current.windSpeed)} км/ч`}
+              value={`${Math.round(current.windSpeed)} км/ч`}
               label="Вятър"
             />
             <StatChip
               icon={<Icon name="speedometer" size={15} color={colors.brand[500]} />}
-              value={`${Math.round(weather.current.humidity)}%`}
+              value={`${Math.round(current.humidity)}%`}
               label="Влажност"
             />
           </View>

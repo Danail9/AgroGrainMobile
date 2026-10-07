@@ -44,12 +44,25 @@ export const subscriptionSchema = z.object({
   cancelAtPeriodEnd: z.boolean(),
 });
 
+export const scheduledChangeSchema = z.object({
+  interval: z.enum(["MONTH", "YEAR"]),
+  tier: z.enum(["BASE", "TRADER"]),
+  effectiveAt: isoDate,
+});
+
 export const checkoutSchema = z.object({
-  /** Null when an active plan was changed on the saved card: nothing to pay in the sheet. */
+  setupIntentClientSecret: z.string().optional(),
+  setupIntentId: z.string().optional(),
+  immediateUpgrade: z.boolean().optional(),
+  /** Null for a scheduled change: no payment is collected now. */
   paymentIntentClientSecret: z.string().nullable(),
+  scheduledChange: scheduledChangeSchema.nullable().optional(),
 });
 
 export const plansSchema = z.object({
+  supportsImmediateUpgrades: z.boolean().optional(),
+  supportsScheduledChanges: z.boolean().optional(),
+  scheduledChange: scheduledChangeSchema.nullable().optional(),
   /** The tier that matches the account type; the screen highlights it. */
   recommendedTier: z.enum(["BASE", "TRADER"]),
   current: z
@@ -490,6 +503,7 @@ export const homeSchema = z.discriminatedUnion("role", [
 /* ---------------------------------------------------------- notifications */
 
 export const notificationTypeSchema = z.enum([
+  "SUBSCRIPTION_UPGRADED",
   "PRICE_MOVE",
   "HEAVY_RAIN",
   "FROST",

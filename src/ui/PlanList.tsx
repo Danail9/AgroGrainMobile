@@ -2,22 +2,24 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useStripe } from "@stripe/stripe-react-native";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 import { z } from "zod";
 
 import { api, isApiError } from "@/api/client";
 import { keys, usePlans, useStartCheckout } from "@/api/queries";
-import { meSchema } from "@/api/schemas";
+import { meSchema, type Me } from "@/api/schemas";
 import { STRIPE_PUBLISHABLE_KEY } from "@/config";
 import { formatShortDate } from "@/lib/format";
-import { colors, space } from "@/theme/tokens";
+import { TIER_LABELS } from "@/lib/plans";
+import { colors, radius, space } from "@/theme/tokens";
 import { Button, FormMessage } from "@/ui/forms";
 import { Icon } from "@/ui/Icon";
-import { Card, Pill } from "@/ui/primitives";
+import { Card, Pill, pressedStyle } from "@/ui/primitives";
 import { QueryBoundary } from "@/ui/QueryBoundary";
 import { AppText } from "@/ui/Text";
 
 type Plan = NonNullable<ReturnType<typeof usePlans>["data"]>["plans"][number];
+type BillingInterval = Plan["interval"];
 
 function formatEuro(cents: number) {
   const value = cents / 100;
@@ -44,24 +46,82 @@ function Features({ items, muted }: { items: string[]; muted?: boolean }) {
 }
 
 /**
- * The portal's billing page: all four plans, the current one marked. Paying
- * happens in Stripe's PaymentSheet; an active paid plan is switched on the
- * saved card. `onChanged` runs once the payment went through.
+ * Role-specific billing plans, with the current subscription marked. Paying
+ * happens in Stripe's PaymentSheet; paid plan changes start at the next renewal.
  */
-export function PlanList({ onChanged }: { onChanged: () => void }) {
+export function PlanList({
+  role,
+  onChanged,
+}: {
+  role: Me["user"]["role"];
+  onChanged: () => void;
+}) {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const plans = usePlans();
   const checkout = useStartCheckout();
   const client = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [billingInterval, setBillingInterval] = useState<BillingInterval | null>(null);
 
-  async function choose(plan: Plan) {
+  async function choose(plan: Plan, immediateUpgrade = false) {
     setError(null);
     setBusy(plan.name);
+    let paymentAccepted = false;
     try {
+      const refreshed = await plans.refetch();
+      const billing = refreshed.data;
+      if (refreshed.isError || !billing) throw new Error("Не успяхме да проверим абонамента. Опитай отново.");
+      if (immediateUpgrade && !billing.supportsImmediateUpgrades) {
+        throw new Error("Незабавното надграждане още не е налично. Не е изпратена заявка за плащане.");
+      }
+      if (billing.current && !billing.current.managedByAdmin &&
+          !immediateUpgrade && !billing.supportsScheduledChanges) {
+        throw new Error("Промяната при подновяване още не е налична. Не е изпратена заявка за плащане. Опитай отново след обновяването на услугата.");
+      }
       if (!STRIPE_PUBLISHABLE_KEY) throw new Error("Плащането не е настроено.");
-      const session = await checkout.mutateAsync({ interval: plan.interval, tier: plan.tier });
+      const input = {
+        interval: plan.interval,
+        tier: plan.tier,
+        changeTiming: immediateUpgrade ? "IMMEDIATE_UPGRADE" as const : "RENEWAL" as const,
+      };
+      let session = await checkout.mutateAsync(input);
+      if (session.setupIntentClientSecret) {
+        if (!immediateUpgrade || !session.setupIntentId) {
+          throw new Error("Сървърът не потвърди добавянето на карта за надграждане.");
+        }
+        const init = await initPaymentSheet({
+          merchantDisplayName: "AgroGrain",
+          setupIntentClientSecret: session.setupIntentClientSecret,
+          returnURL: "agrograin://stripe-redirect",
+        });
+        if (init.error) throw new Error(init.error.message);
+        const result = await presentPaymentSheet();
+        if (result.error) {
+          if (result.error.code !== "Canceled") throw new Error(result.error.message);
+          return;
+        }
+        session = await checkout.mutateAsync({ ...input, setupIntentId: session.setupIntentId });
+      }
+      if (immediateUpgrade && !session.immediateUpgrade) {
+        await plans.refetch();
+        onChanged();
+        throw new Error("Сървърът не потвърди незабавно надграждане. Провери абонамента и плащанията, преди да опиташ отново.");
+      }
+      if (session.scheduledChange) {
+        await plans.refetch();
+        onChanged();
+        Alert.alert(
+          "Промяната е планирана",
+          `${TIER_LABELS[plan.tier]} започва на ${formatShortDate(new Date(session.scheduledChange.effectiveAt))}. Дотогава запазваш текущия си план. Няма плащане сега.`,
+        );
+        return;
+      }
+      if (!session.paymentIntentClientSecret && !session.immediateUpgrade) {
+        await plans.refetch();
+        onChanged();
+        throw new Error("Сървърът не потвърди планирана промяна. Провери текущия си абонамент и плащанията, преди да опиташ отново.");
+      }
       if (session.paymentIntentClientSecret) {
         const init = await initPaymentSheet({
           merchantDisplayName: "AgroGrain",
@@ -76,25 +136,37 @@ export function PlanList({ onChanged }: { onChanged: () => void }) {
           return;
         }
       }
+      paymentAccepted = true;
       // The Stripe webhook activates the plan a moment after the payment.
       const wantsTrade = plan.tier === "TRADER";
       let activated = false;
       for (let attempt = 0; attempt < 12 && !activated; attempt++) {
         // Ask the server to read the payment from Stripe instead of waiting for the webhook.
-        await api("/subscription/sync", { method: "POST", schema: z.object({ synced: z.boolean() }) }).catch(() => undefined);
+        await api("/subscription/sync", { method: "POST", schema: z.object({ synced: z.boolean() }) });
         const me = await api("/me", { schema: meSchema });
         client.setQueryData(keys.me, me);
         const sub = me.subscription;
-        activated = sub.active && sub.tier === plan.tier && (!wantsTrade || sub.canTrade);
+        activated = sub.active && sub.tier === plan.tier && sub.interval === plan.interval && (!wantsTrade || sub.canTrade);
         if (!activated) await new Promise((resolve) => setTimeout(resolve, 1500));
       }
       void client.invalidateQueries({ queryKey: keys.trade });
       void client.invalidateQueries({ queryKey: keys.home });
-      void plans.refetch();
+      void client.invalidateQueries({ queryKey: keys.notifications });
+      await plans.refetch();
       onChanged();
 
       if (activated) {
-        router.replace(wantsTrade ? "/trade" : "/");
+        Alert.alert(
+          "Успешно плащане",
+          wantsTrade
+            ? "Абонаментът ти е активен. Вече имаш достъп до Борса."
+            : "Абонаментът ти е активен. Вече имаш достъп до времето, цените, новините и AI анализите.",
+          [{
+            text: wantsTrade ? "Към Борса" : "Към началото",
+            onPress: () => router.replace(wantsTrade ? "/trade" : "/"),
+          }],
+          { cancelable: false },
+        );
       } else {
         Alert.alert(
           "Плащането е прието",
@@ -102,7 +174,10 @@ export function PlanList({ onChanged }: { onChanged: () => void }) {
         );
       }
     } catch (e) {
-      setError(isApiError(e) || e instanceof Error ? e.message : "Плащането не успя.");
+      const message = isApiError(e) || e instanceof Error ? e.message : "Плащането не успя.";
+      setError(paymentAccepted
+        ? `Плащането е прието, но не успяхме да потвърдим активирането. Не плащай повторно. Обнови абонамента или се свържи с поддръжката. ${message}`
+        : message);
     } finally {
       setBusy(null);
     }
@@ -110,97 +185,269 @@ export function PlanList({ onChanged }: { onChanged: () => void }) {
 
   return (
     <QueryBoundary query={plans} stamp={false}>
-      {({ plans: list, current, recommendedTier }) => (
-        <>
+      {({ plans: list, current, scheduledChange }) => {
+        const interval = billingInterval ?? current?.interval ?? "MONTH";
+        const rolePlans = list.filter((plan) =>
+          role === "FARMER" || (role === "TRADER" && plan.tier === "TRADER"),
+        );
+        const visiblePlans = rolePlans.filter((plan) => plan.interval === interval);
+
+        return (
+          <>
           {current ? (
-            <Card style={{ gap: 4 }}>
-              <AppText variant="small" bold>
-                Активен план:{" "}
-                {list.find((p) => p.interval === current.interval && p.tier === current.tier)?.name}
+            <Card
+              style={{
+                gap: 6,
+                backgroundColor: colors.brand[50],
+                borderColor: colors.brand[200],
+                borderWidth: 1,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+                <Icon name="checkmark-circle" size={20} color={colors.brand[700]} />
+                <AppText variant="small" bold style={{ flex: 1 }}>
+                  Текущ абонамент
+                </AppText>
+                <Pill tone="brand">{current.interval === "MONTH" ? "Месечен" : "Годишен"}</Pill>
+              </View>
+              <AppText variant="heading">
+                {TIER_LABELS[current.tier]}
               </AppText>
+              {current.currentPeriodEnd ? (
+                <AppText variant="small" bold>
+                  Валиден до: {formatShortDate(new Date(current.currentPeriodEnd))}.{new Date(current.currentPeriodEnd).getFullYear()}
+                </AppText>
+              ) : null}
               <AppText variant="caption" tone="muted">
                 {current.managedByAdmin
                   ? "Достъпът е предоставен от администратор."
                   : current.currentPeriodEnd
-                    ? `${current.cancelAtPeriodEnd ? "Приключва" : "Подновява се"} на ${formatShortDate(new Date(current.currentPeriodEnd))}`
+                    ? current.cancelAtPeriodEnd
+                      ? "Автоматичното подновяване е спряно."
+                      : `Следващо подновяване: ${formatShortDate(new Date(current.currentPeriodEnd))}.${new Date(current.currentPeriodEnd).getFullYear()}.`
                     : "Активен"}
               </AppText>
             </Card>
           ) : null}
+          {scheduledChange ? (
+            <Card style={{ gap: space.sm, backgroundColor: colors.brand[50] }}>
+              <AppText variant="small" bold>Планирана промяна</AppText>
+              <AppText variant="small">
+                {TIER_LABELS[scheduledChange.tier]} · {scheduledChange.interval === "YEAR" ? "годишен" : "месечен"}
+              </AppText>
+              <AppText variant="caption" tone="muted">
+                Започва на {formatShortDate(new Date(scheduledChange.effectiveAt))}. Дотогава запазваш текущия си план. Няма плащане сега.
+              </AppText>
+              {current?.tier === "BASE" && !current.managedByAdmin &&
+                scheduledChange.tier === "TRADER" &&
+                scheduledChange.interval === current.interval ? (
+                  <Button
+                    title="Виж опцията за надграждане сега"
+                    variant="secondary"
+                    compact
+                    onPress={() => setBillingInterval(current.interval)}
+                  />
+                ) : null}
+            </Card>
+          ) : null}
 
-          {list.map((plan) => {
-            const isCurrent =
-              current?.interval === plan.interval && current.tier === plan.tier;
-            const best = plan.interval === "YEAR" && plan.tier === "TRADER";
-            return (
-              <Card
-                key={plan.name}
-                style={{
-                  gap: space.md,
-                  borderWidth: best || plan.tier === recommendedTier ? 2 : 0,
-                  borderColor: best ? colors.brand[600] : colors.brand[100],
-                }}
-              >
-                <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.sm }}>
-                  <AppText bold style={{ flex: 1 }}>
-                    {plan.name}
-                  </AppText>
-                  {best ? <Pill tone="brand">Най-изгоден</Pill> : null}
-                </View>
-                <View>
-                  <AppText variant="title">
-                    {formatEuro(plan.priceCents)}{" "}
-                    <AppText variant="small" tone="muted">
-                      {plan.suffix}
+          <View style={{ gap: space.sm }}>
+            <AppText variant="heading">
+              Период на плащане
+            </AppText>
+            <View
+              accessibilityRole="tablist"
+              style={{
+                flexDirection: "row",
+                padding: 5,
+                gap: 5,
+                borderRadius: radius.lg,
+                borderWidth: 1,
+                borderColor: colors.brand[100],
+                backgroundColor: colors.brand[50],
+              }}
+            >
+              {([
+                { key: "MONTH", label: "Месечно", note: "За 1 месец" },
+                { key: "YEAR", label: "Годишно", note: "За 12 месеца" },
+              ] as const).map((option) => {
+                const selected = interval === option.key;
+                return (
+                  <Pressable
+                    key={option.key}
+                    accessibilityRole="tab"
+                    accessibilityLabel={option.label}
+                    accessibilityHint={option.note}
+                    accessibilityState={{ selected }}
+                    onPress={() => setBillingInterval(option.key)}
+                    style={({ pressed }) => [{
+                      flex: 1,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 3,
+                      minHeight: 64,
+                      borderRadius: radius.md,
+                      paddingHorizontal: space.sm,
+                      paddingVertical: space.md,
+                      backgroundColor: selected ? colors.brand[600] : "transparent",
+                    }, pressed && pressedStyle]}
+                  >
+                    <AppText
+                      variant="small"
+                      bold
+                      style={{ color: selected ? colors.white : colors.ink }}
+                    >
+                      {option.label}
                     </AppText>
-                  </AppText>
-                  {plan.savingCents ? (
-                    <AppText variant="caption" style={{ color: colors.brand[600] }}>
-                      Спестяваш {formatEuro(plan.savingCents)} спрямо месечния
+                    <AppText
+                      variant="caption"
+                      align="center"
+                      style={{ color: selected ? colors.white : colors.muted }}
+                    >
+                      {option.note}
                     </AppText>
-                  ) : null}
-                </View>
-                <Features items={plan.features} />
-                {plan.tradeFeatures.length ? (
-                  <>
-                    <AppText variant="caption" tone="muted" bold>
-                      ЗА ТЪРГОВЦИ
-                    </AppText>
-                    <Features items={plan.tradeFeatures} />
-                  </>
-                ) : (
-                  <AppText variant="caption" tone="muted">
-                    Без достъп до Борса.
-                  </AppText>
-                )}
-                <Button
-                  title={isCurrent ? "Текущият ти план" : current && !current.managedByAdmin ? "Смени и плати" : "Избери и плати"}
-                  variant={isCurrent ? "secondary" : "primary"}
-                  disabled={isCurrent || busy !== null}
-                  loading={busy === plan.name}
-                  onPress={() => {
-                    const switching = !!current && !current.managedByAdmin;
-                    if (!switching) return void choose(plan);
-                    Alert.alert(
-                      `Смяна на плана: ${plan.name}`,
-                      `Сменяш на „${plan.name}“ за ${formatEuro(plan.priceCents)} ${plan.suffix}. Ще бъде удържана разликата за оставащия период от запазената ти карта.`,
-                      [
-                        { text: "Отказ", style: "cancel" },
-                        { text: "Плати", onPress: () => void choose(plan) },
-                      ],
-                    );
+                  </Pressable>
+                );
+              })}
+            </View>
+            <AppText variant="caption" tone="muted">
+              {interval === "MONTH"
+                ? "Плащаш за един месец при всяко подновяване."
+                : "Плащаш за цялата година наведнъж."}
+            </AppText>
+          </View>
+
+          {visiblePlans.length ? (
+            visiblePlans.map((plan) => {
+              const isCurrent =
+                current?.interval === plan.interval && current.tier === plan.tier;
+              const isScheduled = scheduledChange?.interval === plan.interval &&
+                scheduledChange.tier === plan.tier;
+              const canUpgrade = current && !current.managedByAdmin &&
+                current.tier === "BASE" && plan.tier === "TRADER" &&
+                current.interval === plan.interval;
+
+              return (
+                <Card
+                  key={plan.name}
+                  style={{
+                    gap: space.md,
+                    borderWidth: isCurrent ? 2 : 0,
+                    borderColor: colors.brand[600],
                   }}
-                />
-              </Card>
-            );
-          })}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: space.sm,
+                    }}
+                  >
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <AppText variant="heading">{TIER_LABELS[plan.tier]}</AppText>
+                      <AppText variant="caption" tone="muted">
+                        {plan.tier === "BASE"
+                          ? "За стопани"
+                          : role === "FARMER"
+                            ? "За стопани с достъп до Борса"
+                            : "За търговци"}
+                      </AppText>
+                    </View>
+                    {isCurrent ? <Pill tone="brand">Текущ план</Pill> : null}
+                  </View>
+
+                  <View style={{ gap: 2 }}>
+                    <AppText variant="title">
+                      {formatEuro(plan.priceCents)}{" "}
+                      <AppText variant="small" tone="muted">
+                        {plan.suffix}
+                      </AppText>
+                    </AppText>
+                    {plan.savingCents ? (
+                      <AppText variant="caption" style={{ color: colors.brand[700] }}>
+                        Спестяваш {formatEuro(plan.savingCents)} спрямо месечно плащане
+                      </AppText>
+                    ) : null}
+                  </View>
+
+                  {plan.features.length ? (
+                    <View style={{ gap: space.sm }}>
+                      <AppText variant="caption" tone="muted" bold>
+                        Включено в плана
+                      </AppText>
+                      <Features items={plan.features} />
+                    </View>
+                  ) : null}
+                  {plan.tradeFeatures.length ? (
+                    <View style={{ gap: space.sm }}>
+                      <AppText variant="caption" tone="muted" bold>
+                        Включена Борса
+                      </AppText>
+                      <Features items={plan.tradeFeatures} />
+                    </View>
+                  ) : (
+                    <AppText variant="caption" tone="muted">
+                      Борсата не е включена в този план.
+                    </AppText>
+                  )}
+                  <Button
+                    title={
+                      canUpgrade
+                        ? "Надгради сега"
+                        : isScheduled
+                        ? "Планиран за подновяване"
+                        : isCurrent
+                        ? "Текущият ти план"
+                        : current && !current.managedByAdmin
+                          ? "Промени при подновяване"
+                          : "Избери този план"
+                    }
+                    variant={isCurrent ? "secondary" : "primary"}
+                    disabled={isCurrent || (isScheduled && !canUpgrade) || busy !== null}
+                    loading={busy === plan.name}
+                    onPress={() => {
+                      const switching = !!current && !current.managedByAdmin;
+                      if (!switching) return void choose(plan);
+                      if (canUpgrade) {
+                        Alert.alert(
+                          "Надграждане сега",
+                          `Борсата ще бъде активирана веднага след успешно плащане. Stripe ще начисли разликата за оставащия платен период от запазената карта. Новата цена е ${formatEuro(plan.priceCents)} ${plan.suffix}. Датата на подновяване остава същата.${scheduledChange ? " Това заменя планираната промяна." : ""}`,
+                          [
+                            { text: "Отказ", style: "cancel" },
+                            { text: "Надгради и плати", onPress: () => void choose(plan, true) },
+                          ],
+                        );
+                        return;
+                      }
+                      Alert.alert(
+                        "Промяна при подновяване",
+                        `„${plan.name}“ за ${formatEuro(plan.priceCents)} ${plan.suffix} ще започне след края на текущия платен период${current.currentPeriodEnd ? ` на ${formatShortDate(new Date(current.currentPeriodEnd))}` : ""}. Запазваш текущия си достъп дотогава. Няма плащане сега.${scheduledChange ? " Това заменя вече планираната промяна." : ""}`,
+                        [
+                          { text: "Отказ", style: "cancel" },
+                          { text: "Планирай промяната", onPress: () => void choose(plan) },
+                        ],
+                      );
+                    }}
+                  />
+                </Card>
+              );
+            })
+          ) : (
+            <Card>
+              <AppText variant="small" tone="muted">
+                В момента няма налични планове с {interval === "MONTH" ? "месечно" : "годишно"} плащане.
+              </AppText>
+            </Card>
+          )}
 
           <FormMessage error={error} />
           <AppText variant="caption" tone="muted" style={{ textAlign: "center" }}>
-            Цените са в евро, без ДДС. Абонаментът се подновява автоматично и може да бъде спрян по всяко време.
+            Цената е за избрания период и е без ДДС. Абонаментът се подновява автоматично и може да бъде спрян по всяко време.
           </AppText>
-        </>
-      )}
+          </>
+        );
+      }}
     </QueryBoundary>
   );
 }

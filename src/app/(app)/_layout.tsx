@@ -85,6 +85,7 @@ export default function AppLayout() {
   if (!subscription.active) {
     return (
       <Paywall
+        role={user.role}
         checking={me.isFetching}
         onRefresh={() => void me.refetch()}
         actions={<SignOutButton />}

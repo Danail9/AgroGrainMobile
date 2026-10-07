@@ -64,6 +64,60 @@ Server-side behaviour changes beyond new routes:
 
 ## Added after the first pass
 
+Paid plan changes in the mobile subscription screen are scheduled by
+`POST /api/v1/subscription/checkout` for the end of the current Stripe period.
+The response and `GET /api/v1/subscription/plans` include `scheduledChange`
+(tier, interval, effectiveAt). The current plan stays active until that date;
+there is no immediate prorated charge. Deploy the matching app-web backend
+before using this flow. New subscriptions still use the PaymentSheet.
+The plans endpoint advertises `supportsScheduledChanges: true`. Before sending
+a checkout request for a paid plan change, the app refreshes this capability
+and blocks older backends, which would otherwise charge and change immediately.
+Same-interval BASE → TRADER upgrades explicitly send
+`changeTiming: IMMEDIATE_UPGRADE`, gated by `supportsImmediateUpgrades`.
+Stripe charges the prorated difference on the saved card with
+`error_if_incomplete`; access is synchronized only after a successful update.
+Downgrades and interval changes remain scheduled for renewal. An existing
+Stripe schedule for a different target blocks immediate upgrades. A matching
+scheduled upgrade is explicitly replaced; if payment fails, the backend restores
+the scheduled upgrade, or reports a restoration failure requiring support.
+If neither the subscription nor customer has a default payment method, checkout
+returns a SetupIntent first. The app collects a card in Stripe's PaymentSheet,
+then resubmits its SetupIntent ID. The backend verifies successful setup and
+customer/user/subscription ownership before setting the subscription's default
+method and charging the upgrade. Saving a card alone never unlocks access.
+
+Subscription plans are refreshed on mount rather than kept fresh for an hour.
+The backend reconciles paid Stripe access on plan reads (excluding admin grants
+and impersonation). The subscription screen supports pull-to-refresh and refreshes
+account access after plan updates. Activation sync errors after accepted payments
+are shown explicitly with a warning not to pay again. Subscription webhooks read
+current Stripe state instead of potentially delayed event snapshots.
+After payment and verified activation, the app shows a success confirmation.
+Its button opens Борса for a trade-enabled plan or Home for BASE; no success
+confirmation or redirect is shown for canceled, failed or unconfirmed activation.
+
+Successful immediate upgrades create a `SUBSCRIPTION_UPGRADED` in-app
+confirmation and send push when enabled. The invoice ID deduplicates delivery;
+the notification opens `/trade`. Notification failures are logged without
+reporting a successful payment as failed. Deploy the
+`20261007102000_subscription_upgrade_notification` database migration and
+regenerate Prisma before deploying the backend. Older mobile clients must be
+updated to recognize this notification type.
+
+Price and weather scans and new Борса offers/listings use shared in-app/push
+delivery. Category toggles and the price threshold control scan generation;
+disabling push still stores in-app alerts. Concurrent scans only push alerts
+they actually inserted, and a delivery failure is logged without stopping other
+alerts or recipients. Offers notify farmers, listings notify traders, and
+authors and blocked accounts are excluded.
+
+Automatic price/weather delivery requires an external scheduler to POST to
+the portal's `/api/cron/notifications` endpoint (for example every 15 minutes)
+with `Authorization: Bearer <CRON_SECRET>`. Configure the secret server-side
+and in the scheduler; never put it in an `EXPO_PUBLIC_*` variable. Publishing
+new offers/listings triggers their alerts directly, without the cron job.
+
 Code is in place and covered by unit tests where the logic is pure; none of it has run on a device.
 
 | Feature | Where | Needs before it works |
