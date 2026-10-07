@@ -13,7 +13,7 @@ import { describeSoilMoisture, riskTone, riskyHours, weatherSummary } from "@/li
 describe("plans", () => {
   it("names a plan without any price", () => {
     expect(planName("MONTH", "BASE")).toBe("Стопанин · месечен");
-    expect(planName("YEAR", "TRADER")).toBe("Търговец · годишен");
+    expect(planName("YEAR", "TRADER")).toBe("Стопанин + Борса · годишен");
   });
 
   it("labels every account state", () => {

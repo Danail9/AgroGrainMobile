@@ -1,15 +1,11 @@
-/**
- * Plan names, ported from the portal's `lib/plans.ts`. Deliberately labels
- * only: this is a reader app, so no price, plan comparison or purchase text
- * from the portal's `PRICING` and `*_FEATURES` is carried over.
- */
+/** Subscription product names, distinct from account roles. */
 
-export const TIER_LABELS = { BASE: "Стопанин", TRADER: "Търговец" } as const;
+export const TIER_LABELS = { BASE: "Стопанин", TRADER: "Стопанин + Борса" } as const;
 
 type Interval = "MONTH" | "YEAR";
 type Tier = keyof typeof TIER_LABELS;
 
-/** "Търговец · месечен" */
+/** "Стопанин + Борса · месечен" */
 export function planName(interval: Interval, tier: Tier) {
   return `${TIER_LABELS[tier]} · ${interval === "MONTH" ? "месечен" : "годишен"}`;
 }

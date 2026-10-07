@@ -117,7 +117,9 @@ export default function NotificationsScreen() {
                         accessibilityRole="button"
                         accessibilityLabel={`${unread ? "Непрочетено. " : ""}${item.title}`}
                         onPress={() => {
-                          if (unread) markRead.mutate(item.id);
+                          if (unread) markRead.mutate(item.id, {
+                            onError: (error) => Alert.alert("Известието не е отбелязано като прочетено", error.message),
+                          });
                           if (target) router.push(target);
                         }}
                         style={({ pressed }) => [

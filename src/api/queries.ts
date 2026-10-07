@@ -89,11 +89,12 @@ export const useHome = () =>
     staleTime: 15 * MINUTE,
   });
 
-export const useWeather = () =>
+export const useWeather = (enabled = true) =>
   useQuery({
     queryKey: keys.weather,
     queryFn: ({ signal }) => api("/weather", { schema: weatherResponseSchema, signal }),
     staleTime: 15 * MINUTE,
+    enabled,
   });
 
 export const useMarket = () =>
@@ -335,6 +336,7 @@ export const useMarkAllRead = () =>
     (client) => {
       void client.invalidateQueries({ queryKey: keys.notifications });
       void client.invalidateQueries({ queryKey: keys.me });
+      void client.invalidateQueries({ queryKey: keys.home });
     },
   );
 
@@ -344,6 +346,7 @@ export const useMarkRead = () =>
     (client) => {
       void client.invalidateQueries({ queryKey: keys.notifications });
       void client.invalidateQueries({ queryKey: keys.me });
+      void client.invalidateQueries({ queryKey: keys.home });
     },
   );
 
@@ -353,6 +356,7 @@ export const useClearNotifications = () =>
     (client) => {
       void client.invalidateQueries({ queryKey: keys.notifications });
       void client.invalidateQueries({ queryKey: keys.me });
+      void client.invalidateQueries({ queryKey: keys.home });
     },
   );
 
@@ -362,10 +366,15 @@ export type ChatTurn = { role: "user" | "assistant"; content: string };
 export const sendChat = (messages: ChatTurn[]) =>
   api("/ai/chat", { method: "POST", body: { messages }, schema: chatReplySchema });
 
-/** Buys or changes a plan server-side; returns what the PaymentSheet needs (null: charged on the saved card). */
+/** Buys a plan or schedules a paid plan change for the next renewal. */
 export const useStartCheckout = () =>
   useMutation({
-    mutationFn: (plan: { interval: "MONTH" | "YEAR"; tier: "BASE" | "TRADER" }) =>
+    mutationFn: (plan: {
+      interval: "MONTH" | "YEAR";
+      tier: "BASE" | "TRADER";
+      changeTiming?: "IMMEDIATE_UPGRADE" | "RENEWAL";
+      setupIntentId?: string;
+    }) =>
       api("/subscription/checkout", { method: "POST", body: plan, schema: checkoutSchema }),
   });
 
@@ -373,5 +382,5 @@ export const usePlans = () =>
   useQuery({
     queryKey: ["plans"] as const,
     queryFn: ({ signal }) => api("/subscription/plans", { schema: plansSchema, signal }),
-    staleTime: HOUR,
+    staleTime: 0,
   });

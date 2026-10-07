@@ -9,6 +9,7 @@ export function internalPath(url: string | null): string | null {
 }
 
 export const NOTIFICATION_ICONS = {
+  SUBSCRIPTION_UPGRADED: "checkmark-circle",
   PRICE_MOVE: "trending-up",
   HEAVY_RAIN: "rainy",
   FROST: "snow",
