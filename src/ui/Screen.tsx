@@ -20,12 +20,14 @@ export function ScreenHeader({
   subtitle,
   back,
   right,
+  wrapTitle = false,
 }: {
   title?: string;
   subtitle?: string;
   /** `true` goes back; an href goes there when there is no history (deep link). */
   back?: boolean | Href;
   right?: ReactNode;
+  wrapTitle?: boolean;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -49,7 +51,7 @@ export function ScreenHeader({
       ) : null}
       <View style={{ flex: 1 }}>
         {title ? (
-          <AppText variant="title" numberOfLines={1} accessibilityRole="header">
+          <AppText variant="title" numberOfLines={wrapTitle ? undefined : 1} accessibilityRole="header">
             {title}
           </AppText>
         ) : null}
@@ -69,6 +71,7 @@ export function Screen({
   subtitle,
   back,
   right,
+  wrapTitle = false,
   children,
   onRefresh,
   refreshing = false,
@@ -80,6 +83,7 @@ export function Screen({
   subtitle?: string;
   back?: boolean | Href;
   right?: ReactNode;
+  wrapTitle?: boolean;
   children: ReactNode;
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -116,7 +120,7 @@ export function Screen({
 
   return (
     <View style={styles.root}>
-      <ScreenHeader title={title} subtitle={subtitle} back={back} right={right} />
+      <ScreenHeader title={title} subtitle={subtitle} back={back} right={right} wrapTitle={wrapTitle} />
       {keyboard ? (
         <KeyboardAvoidingView
           style={{ flex: 1 }}

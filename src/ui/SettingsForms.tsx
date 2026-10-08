@@ -236,11 +236,13 @@ function Toggle({
   hint,
   value,
   onChange,
+  disabled = false,
 }: {
   label: string;
   hint: string;
   value: boolean;
   onChange: (value: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 10 }}>
@@ -254,6 +256,7 @@ function Toggle({
       </View>
       <Switch
         accessibilityLabel={label}
+        disabled={disabled}
         value={value}
         onValueChange={onChange}
         trackColor={{ true: colors.brand[500], false: colors.line }}
@@ -268,7 +271,10 @@ function Toggle({
  * its button. The phone-alerts switch only appears in builds that can receive
  * push (not Expo Go).
  */
-export function NotificationPrefsForm({ prefs }: { prefs: Me["notificationPrefs"] }) {
+export function NotificationPrefsForm({ prefs, role }: {
+  prefs: Me["notificationPrefs"];
+  role: Me["user"]["role"];
+}) {
   const update = useUpdatePrefs();
   const [threshold, setThreshold] = useState(String(prefs.priceThreshold));
   const [error, setError] = useState<string | null>(null);
@@ -302,21 +308,36 @@ export function NotificationPrefsForm({ prefs }: { prefs: Me["notificationPrefs"
   return (
     <View>
       <FormMessage error={error} success={success} />
+      <Toggle
+        label="Всички известия"
+        hint="Спира новите известия в приложението и на телефона, без да променя настройките по категории."
+        value={prefs.enabled}
+        disabled={update.isPending}
+        onChange={(enabled) => save({ enabled }, enabled ? "Известията са включени." : "Известията са спрени.")}
+      />
+      <AppText variant="caption" tone="muted">
+        Старите известия остават в историята. Имейлите за плащания и потвържденията на екрана не се спират.
+      </AppText>
+      <Divider />
+      <View pointerEvents={update.isPending || !prefs.enabled ? "none" : "auto"} style={{ opacity: prefs.enabled ? 1 : 0.5 }}>
       {pushSupported() ? (
         <>
           <Toggle
             label="Известия на телефона"
             hint="Получавай алармите като известия, дори когато приложението е затворено."
             value={prefs.push}
+            disabled={!prefs.enabled || update.isPending}
             onChange={(push) => void setPush(push)}
           />
           <Divider />
         </>
       ) : null}
+      <AppText variant="small" bold>Пазарни цени</AppText>
       <Toggle
         label="Промяна в цените"
         hint="Когато дневната промяна надвиши прага по-долу."
         value={prefs.priceMove}
+        disabled={!prefs.enabled || update.isPending}
         onChange={(priceMove) => save({ priceMove }, "Настройките са запазени.")}
       />
       <Divider />
@@ -336,6 +357,7 @@ export function NotificationPrefsForm({ prefs }: { prefs: Me["notificationPrefs"
             variant="secondary"
             title="Запази"
             loading={update.isPending}
+            disabled={!prefs.enabled}
             onPress={() =>
               save({ priceThreshold: Number(normalizeDecimal(threshold)) }, "Настройките са запазени.")
             }
@@ -343,10 +365,12 @@ export function NotificationPrefsForm({ prefs }: { prefs: Me["notificationPrefs"
         </View>
       </View>
       <Divider />
+      <AppText variant="small" bold>Време и полска работа</AppText>
       <Toggle
         label="Очаквани валежи"
         hint="Вероятност за валежи над 60% днес или утре."
         value={prefs.heavyRain}
+        disabled={!prefs.enabled || update.isPending}
         onChange={(heavyRain) => save({ heavyRain }, "Настройките са запазени.")}
       />
       <Divider />
@@ -354,6 +378,7 @@ export function NotificationPrefsForm({ prefs }: { prefs: Me["notificationPrefs"
         label="Ниски температури"
         hint="Минимална температура до 2°C."
         value={prefs.frost}
+        disabled={!prefs.enabled || update.isPending}
         onChange={(frost) => save({ frost }, "Настройките са запазени.")}
       />
       <Divider />
@@ -361,6 +386,7 @@ export function NotificationPrefsForm({ prefs }: { prefs: Me["notificationPrefs"
         label="Силен вятър"
         hint="Пориви над 25 км/ч — рисково за пръскане."
         value={prefs.strongWind}
+        disabled={!prefs.enabled || update.isPending}
         onChange={(strongWind) => save({ strongWind }, "Настройките са запазени.")}
       />
       <Divider />
@@ -368,8 +394,44 @@ export function NotificationPrefsForm({ prefs }: { prefs: Me["notificationPrefs"
         label="Подходящи дни за работа"
         hint="Когато се отвори добър прозорец за полска работа."
         value={prefs.goodFieldWork}
+        disabled={!prefs.enabled || update.isPending}
         onChange={(goodFieldWork) => save({ goodFieldWork }, "Настройките са запазени.")}
       />
+      {role !== "ADMIN" ? <>
+      <Divider />
+      <AppText variant="small" bold>Борса</AppText>
+      {role === "FARMER" ? <Toggle
+        label="Нови оферти в Борса"
+        hint="Оферти от търговци към стопани."
+        value={prefs.newOffer}
+        disabled={!prefs.enabled || update.isPending}
+        onChange={(newOffer) => save({ newOffer }, "Настройките са запазени.")}
+      /> : null}
+      {role === "TRADER" ? <Toggle
+        label="Нови обяви в Борса"
+        hint="Обяви от стопани към търговци."
+        value={prefs.newListing}
+        disabled={!prefs.enabled || update.isPending}
+        onChange={(newListing) => save({ newListing }, "Настройките са запазени.")}
+      /> : null}
+      </> : null}
+      <Divider />
+      <AppText variant="small" bold>Абонамент</AppText>
+      <Toggle
+        label="Надграждане на абонамента"
+        hint="Известие при успешно надграждане на плана."
+        value={prefs.subscriptionUpgrade}
+        disabled={!prefs.enabled || update.isPending}
+        onChange={(subscriptionUpgrade) => save({ subscriptionUpgrade }, "Настройките са запазени.")}
+      />
+      <Toggle
+        label="Напомняне за абонамента"
+        hint="7 дни преди изтичане или автоматично подновяване."
+        value={prefs.subscriptionReminder}
+        disabled={!prefs.enabled || update.isPending}
+        onChange={(subscriptionReminder) => save({ subscriptionReminder }, "Настройките са запазени.")}
+      />
+      </View>
     </View>
   );
 }

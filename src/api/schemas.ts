@@ -89,6 +89,11 @@ export const plansSchema = z.object({
 });
 
 export const notificationPrefsSchema = z.object({
+  enabled: z.boolean(),
+  newOffer: z.boolean(),
+  newListing: z.boolean(),
+  subscriptionUpgrade: z.boolean(),
+  subscriptionReminder: z.boolean(),
   priceMove: z.boolean(),
   priceThreshold: z.number(),
   heavyRain: z.boolean(),
@@ -504,6 +509,7 @@ export const homeSchema = z.discriminatedUnion("role", [
 
 export const notificationTypeSchema = z.enum([
   "SUBSCRIPTION_UPGRADED",
+  "SUBSCRIPTION_REMINDER",
   "PRICE_MOVE",
   "HEAVY_RAIN",
   "FROST",

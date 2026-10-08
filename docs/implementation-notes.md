@@ -64,6 +64,35 @@ Server-side behaviour changes beyond new routes:
 
 ## Added after the first pass
 
+The notification cron sends user subscription reminders on its first run within
+7 days before the paid period ends (including catch-up after a missed run).
+Auto-renewing Stripe plans get a renewal reminder; canceled, bank-paid and
+manually granted plans get an expiry warning with the full date. Blocked/admin
+and individually free accounts, unpaid/expired plans and already prepaid renewals
+are excluded. The master switch and `subscriptionReminder` control in-app/push
+delivery; payment emails are unchanged. Each subscription/period dedupe key is
+stable across scans. `/billing` links open `/subscription` on mobile.
+Deploy migration `20261008113000_subscription_reminders`, regenerate Prisma
+and update mobile before enabling reminders. An external scheduler must POST
+`/api/cron/notifications` with the server-side cron secret (e.g. every 15 minutes);
+no new scheduler is provisioned here.
+
+Home greetings, crop names in price rows, and Home offer titles/seller names
+wrap onto additional lines instead of truncating. Other screen titles keep their
+existing single-line layout.
+
+Notification preferences include a master `enabled` switch and individual
+`newOffer`, `newListing`, and `subscriptionUpgrade` switches alongside existing
+price/weather categories. Disabling the master switch pauses new in-app and push
+alerts without resetting categories or deleting history. Payment emails and
+on-screen payment confirmations are independent. Deploy the backend and apply
+`20261007151000_notification_controls` before updating the mobile client; both
+wire schemas require the new fields. Existing users retain enabled alerts by
+default. The web settings form exposes the same controls.
+Борса preferences follow recipient roles: farmers see new offers, traders see
+new listings, and admins see neither. Hidden preferences are preserved when
+saving web settings; mobile updates only the selected field.
+
 Paid plan changes in the mobile subscription screen are scheduled by
 `POST /api/v1/subscription/checkout` for the end of the current Stripe period.
 The response and `GET /api/v1/subscription/plans` include `scheduledChange`

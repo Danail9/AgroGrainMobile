@@ -41,7 +41,7 @@ export function PriceRow({
         pressed && pressedStyle,
       ]}
     >
-      <AppText variant="body" numberOfLines={1} style={{ flex: 1, fontWeight: "500" }}>
+      <AppText variant="body" style={{ flex: 1, fontWeight: "500" }}>
         {price.emoji} {price.name}
       </AppText>
       <AppText variant="body" numeric bold style={{ fontSize: 17 }}>
