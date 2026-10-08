@@ -98,7 +98,7 @@ export default function SettingsScreen() {
               <AppText variant="small" bold>
                 Известия
               </AppText>
-              <NotificationPrefsForm prefs={notificationPrefs} />
+              <NotificationPrefsForm prefs={notificationPrefs} role={user.role} />
             </Card>
 
             <Card style={{ gap: space.md }}>

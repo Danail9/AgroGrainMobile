@@ -46,6 +46,7 @@ export default function HomeScreen() {
     <Screen
       tabbed
       title={salutation}
+      wrapTitle
       subtitle={formatLongDate()}
       right={<HeaderActions unreadCount={unread} news={!trader} />}
       onRefresh={() => {
@@ -248,10 +249,10 @@ function FarmerView({
                   ]}
                 >
                   <View style={{ flex: 1 }}>
-                    <AppText variant="body" numberOfLines={1} style={{ fontWeight: "500" }}>
+                    <AppText variant="body" style={{ fontWeight: "500" }}>
                       {offer.title}
                     </AppText>
-                    <AppText variant="caption" tone="muted" numberOfLines={1}>
+                    <AppText variant="caption" tone="muted">
                       {offer.trader.farmName || offer.trader.name}
                     </AppText>
                   </View>

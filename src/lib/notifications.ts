@@ -5,11 +5,13 @@
  */
 export function internalPath(url: string | null): string | null {
   if (!url) return null;
+  if (url === "/billing") return "/subscription";
   return /^\/[A-Za-z0-9_\-/]*$/.test(url) && !url.includes("//") ? url : null;
 }
 
 export const NOTIFICATION_ICONS = {
   SUBSCRIPTION_UPGRADED: "checkmark-circle",
+  SUBSCRIPTION_REMINDER: "calendar",
   PRICE_MOVE: "trending-up",
   HEAVY_RAIN: "rainy",
   FROST: "snow",

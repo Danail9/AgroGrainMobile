@@ -7,6 +7,7 @@ import { GATE_COPY, Gate } from "@/ui/Gate";
 import { ChangeBadge, Pill, SampleSpecs, UnreadBadge } from "@/ui/primitives";
 import { QueryBoundary } from "@/ui/QueryBoundary";
 import { DeleteAccountForm } from "@/ui/SettingsForms";
+import { ScreenHeader } from "@/ui/Screen";
 
 jest.mock("expo-router", () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
@@ -31,6 +32,19 @@ function query(partial: Partial<UseQueryResult<string, Error>>) {
 }
 
 const body = (data: string) => <Text>{`DATA:${data}`}</Text>;
+
+describe("header name wrapping", () => {
+  it("allows long home greetings to wrap without truncation", async () => {
+    const title = "Добър вечер, Dobromir!";
+    await render(<ScreenHeader title={title} wrapTitle />);
+    expect(screen.getByText(title).props.numberOfLines).toBeUndefined();
+  });
+
+  it("preserves single-line titles for other screens", async () => {
+    await render(<ScreenHeader title="Профил" />);
+    expect(screen.getByText("Профил").props.numberOfLines).toBe(1);
+  });
+});
 
 describe("QueryBoundary", () => {
   it("shows the screen when data is present", async () => {

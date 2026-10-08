@@ -12,7 +12,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "bg.agrograin.mobile",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSSpeechRecognitionUsageDescription": "AgroGrain използва разпознаване на реч, за да превърне гласа ти в текст.",
+        "NSMicrophoneUsageDescription": "AgroGrain използва микрофона, за да можеш да задаваш въпроси с глас."
       },
       "associatedDomains": [
         "applinks:www.agrograinhub.bg"
@@ -43,6 +45,9 @@
             "DEFAULT"
           ]
         }
+      ],
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -66,7 +71,19 @@
           "speechRecognitionPermission": "AgroGrain използва разпознаване на реч, за да превърне гласа ти в текст."
         }
       ],
-      ["@stripe/stripe-react-native", { "enableGooglePay": false }]
-    ]
+      [
+        "@stripe/stripe-react-native",
+        {
+          "enableGooglePay": false
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6ac3fbd7-5d7e-487e-8adb-d0eeabc0272c"
+      }
+    },
+    "owner": "danail-minchev"
   }
 }

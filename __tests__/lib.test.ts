@@ -37,6 +37,7 @@ describe("plans", () => {
 describe("internalPath", () => {
   it("follows plain in-app paths", () => {
     expect(internalPath("/weather")).toBe("/weather");
+    expect(internalPath("/billing")).toBe("/subscription");
     expect(internalPath("/trade/offers/ck3x9a")).toBe("/trade/offers/ck3x9a");
   });
 
