@@ -1,11 +1,12 @@
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
-import { Alert } from "react-native";
 import { router } from "expo-router";
 
 import { api } from "@/api/client";
 import { plansSchema } from "@/api/schemas";
+import { showDialog } from "@/ui/Dialog";
 import { PlanList } from "@/ui/PlanList";
 
+jest.mock("@/ui/Dialog", () => ({ showDialog: jest.fn() }));
 jest.mock("@/config", () => ({ STRIPE_PUBLISHABLE_KEY: "pk_test_placeholder" }));
 jest.mock("@/api/client", () => ({
   ...jest.requireActual("@/api/client"),
@@ -79,6 +80,7 @@ describe("role-specific subscription plans", () => {
     mockPresentSheet.mockReset();
     jest.mocked(api).mockReset();
     jest.mocked(router.replace).mockClear();
+    jest.mocked(showDialog).mockClear();
     jest.restoreAllMocks();
   });
 
@@ -101,7 +103,7 @@ describe("role-specific subscription plans", () => {
   });
   it("collects a missing card then completes the immediate upgrade", async () => {
     if (mockPlans.current) mockPlans.current.tier = "BASE";
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    const alert = jest.mocked(showDialog);
     mockCheckout
       .mockResolvedValueOnce({
         paymentIntentClientSecret: null, setupIntentClientSecret: "seti_secret", setupIntentId: "seti_1",
@@ -114,7 +116,7 @@ describe("role-specific subscription plans", () => {
     });
     await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
     await fireEvent.press(screen.getByText("Надгради сега"));
-    const confirm = alert.mock.calls[0]?.[2]?.find((button) => button.text === "Надгради и плати");
+    const confirm = alert.mock.calls[0]?.[0].actions?.find((button) => button.label === "Надгради и плати");
     await act(async () => { confirm?.onPress?.(); });
     expect(mockInitSheet).toHaveBeenCalledWith(expect.objectContaining({
       setupIntentClientSecret: "seti_secret",
@@ -123,15 +125,15 @@ describe("role-specific subscription plans", () => {
       interval: "MONTH", tier: "TRADER", changeTiming: "IMMEDIATE_UPGRADE", setupIntentId: "seti_1",
     });
     expect(router.replace).not.toHaveBeenCalled();
-    const success = alert.mock.calls.find(([title]) => title === "Успешно плащане");
-    expect(success?.[1]).toContain("Вече имаш достъп до Борса");
-    await act(async () => { success?.[2]?.[0].onPress?.(); });
+    const success = alert.mock.calls.find(([dialog]) => dialog.title === "Успешно плащане");
+    expect(success?.[0].message).toContain("Вече имаш достъп до Борса");
+    await act(async () => { success?.[0].actions?.[0].onPress?.(); });
     expect(router.replace).toHaveBeenCalledWith("/trade");
   });
 
   it("does not charge or unlock access when card entry is canceled", async () => {
     if (mockPlans.current) mockPlans.current.tier = "BASE";
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    const alert = jest.mocked(showDialog);
     mockCheckout.mockResolvedValue({
       paymentIntentClientSecret: null, setupIntentClientSecret: "seti_secret", setupIntentId: "seti_1",
     });
@@ -139,14 +141,14 @@ describe("role-specific subscription plans", () => {
     mockPresentSheet.mockResolvedValue({ error: { code: "Canceled" } });
     await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
     await fireEvent.press(screen.getByText("Надгради сега"));
-    const confirm = alert.mock.calls[0]?.[2]?.find((button) => button.text === "Надгради и плати");
+    const confirm = alert.mock.calls[0]?.[0].actions?.find((button) => button.label === "Надгради и плати");
     await act(async () => { confirm?.onPress?.(); });
     expect(mockCheckout).toHaveBeenCalledTimes(1);
     expect(router.replace).not.toHaveBeenCalled();
     expect(api).not.toHaveBeenCalled();
   });
   it("activates a new subscription after PaymentSheet succeeds", async () => {
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    const alert = jest.mocked(showDialog);
     const previous = mockPlans.current;
     mockPlans.current = null;
     mockCheckout.mockResolvedValue({ paymentIntentClientSecret: "pi_secret" });
@@ -170,9 +172,9 @@ describe("role-specific subscription plans", () => {
       expect(api).toHaveBeenNthCalledWith(2, "/me", expect.any(Object));
       expect(onChanged).toHaveBeenCalled();
       expect(router.replace).not.toHaveBeenCalled();
-      const success = alert.mock.calls.find(([title]) => title === "Успешно плащане");
-      expect(success?.[2]?.[0].text).toBe("Към началото");
-      await act(async () => { success?.[2]?.[0].onPress?.(); });
+      const success = alert.mock.calls.find(([dialog]) => dialog.title === "Успешно плащане");
+      expect(success?.[0].actions?.[0].label).toBe("Към началото");
+      await act(async () => { success?.[0].actions?.[0].onPress?.(); });
       expect(router.replace).toHaveBeenCalledWith("/");
     } finally {
       mockPlans.current = previous;
@@ -181,12 +183,12 @@ describe("role-specific subscription plans", () => {
 
   it("warns against paying again when activation sync fails after payment", async () => {
     if (mockPlans.current) mockPlans.current.tier = "BASE";
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    const alert = jest.mocked(showDialog);
     mockCheckout.mockResolvedValue({ immediateUpgrade: true, paymentIntentClientSecret: null });
     jest.mocked(api).mockRejectedValue(new Error("Sync unavailable"));
     await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
     await fireEvent.press(screen.getByText("Надгради сега"));
-    const confirm = alert.mock.calls[0]?.[2]?.find((button) => button.text === "Надгради и плати");
+    const confirm = alert.mock.calls[0]?.[0].actions?.find((button) => button.label === "Надгради и плати");
     await act(async () => { confirm?.onPress?.(); });
     expect(await screen.findByText(/Не плащай повторно/)).toBeTruthy();
     expect(screen.getByText(/Sync unavailable/)).toBeTruthy();
@@ -195,7 +197,7 @@ describe("role-specific subscription plans", () => {
   });
   it("upgrades immediately after confirmation and opens Борса with refreshed access", async () => {
     if (mockPlans.current) mockPlans.current.tier = "BASE";
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    const alert = jest.mocked(showDialog);
     mockCheckout.mockResolvedValue({ immediateUpgrade: true, paymentIntentClientSecret: null });
     jest.mocked(api).mockResolvedValue({
       subscription: { active: true, tier: "TRADER", interval: "MONTH", canTrade: true },
@@ -204,8 +206,7 @@ describe("role-specific subscription plans", () => {
     await render(<PlanList role="FARMER" onChanged={onChanged} />);
     await fireEvent.press(screen.getByText("Надгради сега"));
     expect(mockCheckout).not.toHaveBeenCalled();
-    const confirm = alert.mock.calls[0]?.[2]?.find(
-      (button) => button.text === "Надгради и плати",
+    const confirm = alert.mock.calls[0]?.[0].actions?.find((button) => button.label === "Надгради и плати",
     );
     expect(confirm).toBeDefined();
     await act(async () => { confirm?.onPress?.(); });
@@ -214,28 +215,26 @@ describe("role-specific subscription plans", () => {
     });
     expect(onChanged).toHaveBeenCalled();
     expect(router.replace).not.toHaveBeenCalled();
-    expect(alert).toHaveBeenCalledWith(
-      "Успешно плащане",
-      expect.stringContaining("Вече имаш достъп до Борса"),
-      [expect.objectContaining({ text: "Към Борса" })],
-      { cancelable: false },
-    );
-    const success = alert.mock.calls.find(([title]) => title === "Успешно плащане");
-    await act(async () => { success?.[2]?.[0].onPress?.(); });
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Успешно плащане",
+      message: expect.stringContaining("Вече имаш достъп до Борса"),
+      actions: [expect.objectContaining({ label: "Към Борса" })],
+    }));
+    const success = alert.mock.calls.find(([dialog]) => dialog.title === "Успешно плащане");
+    await act(async () => { success?.[0].actions?.[0].onPress?.(); });
     expect(router.replace).toHaveBeenCalledWith("/trade");
   });
 
   it("does not treat a scheduled response as a successful immediate upgrade", async () => {
     if (mockPlans.current) mockPlans.current.tier = "BASE";
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    const alert = jest.mocked(showDialog);
     mockCheckout.mockResolvedValue({
       paymentIntentClientSecret: null,
       scheduledChange: { tier: "TRADER", interval: "MONTH", effectiveAt: "2027-10-06T08:00:00.000Z" },
     });
     await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
     await fireEvent.press(screen.getByText("Надгради сега"));
-    const confirm = alert.mock.calls[0]?.[2]?.find(
-      (button) => button.text === "Надгради и плати",
+    const confirm = alert.mock.calls[0]?.[0].actions?.find((button) => button.label === "Надгради и плати",
     );
     await act(async () => { confirm?.onPress?.(); });
     expect(await screen.findByText(/Сървърът не потвърди незабавно надграждане/)).toBeTruthy();
@@ -249,23 +248,25 @@ describe("role-specific subscription plans", () => {
     mockPlans.scheduledChange = {
       tier: "TRADER", interval: "YEAR", effectiveAt: "2027-10-06T08:00:00.000Z",
     };
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    const alert = jest.mocked(showDialog);
     await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
     await fireEvent.press(screen.getByText("Месечно"));
     await fireEvent.press(screen.getByText("Виж опцията за надграждане сега"));
     expect(screen.getByRole("tab", { name: "Годишно", selected: true })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Надгради сега", disabled: false })).toBeTruthy();
     await fireEvent.press(screen.getByText("Надгради сега"));
-    expect(alert).toHaveBeenCalledWith("Надграждане сега",
-      expect.stringContaining("Това заменя планираната промяна"), expect.any(Array));
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Надграждане сега", message: expect.stringContaining("Това заменя планираната промяна"),
+    }));
   });
   it("offers an immediate same-period upgrade but schedules annual changes", async () => {
     if (mockPlans.current) mockPlans.current.tier = "BASE";
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    const alert = jest.mocked(showDialog);
     await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
     await fireEvent.press(screen.getByText("Надгради сега"));
-    expect(alert).toHaveBeenCalledWith("Надграждане сега",
-      expect.stringContaining("оставащия платен период"), expect.any(Array));
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Надграждане сега", message: expect.stringContaining("оставащия платен период"),
+    }));
     await fireEvent.press(screen.getByText("Годишно"));
     expect(screen.queryByText("Надгради сега")).toBeNull();
     expect(screen.getAllByText("Промени при подновяване")).toHaveLength(2);
@@ -273,11 +274,10 @@ describe("role-specific subscription plans", () => {
 
   it("blocks older backends before sending a checkout that could charge immediately", async () => {
     mockPlans.supportsScheduledChanges = undefined;
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    const alert = jest.mocked(showDialog);
     await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
     await fireEvent.press(screen.getByText("Промени при подновяване"));
-    const confirm = alert.mock.calls[0]?.[2]?.find(
-      (button) => button.text === "Планирай промяната",
+    const confirm = alert.mock.calls[0]?.[0].actions?.find((button) => button.label === "Планирай промяната",
     );
     expect(confirm).toBeDefined();
     await act(async () => { confirm?.onPress?.(); });

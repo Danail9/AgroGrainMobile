@@ -10,6 +10,7 @@ import { DetailList, DetailRow } from "@/ui/DetailRow";
 import { Button } from "@/ui/forms";
 import { Card, Pill, SampleSpecs } from "@/ui/primitives";
 import { ErrorState, QueryBoundary } from "@/ui/QueryBoundary";
+import { SaveButton } from "@/ui/SaveButton";
 import { Screen } from "@/ui/Screen";
 import { AppText } from "@/ui/Text";
 
@@ -90,6 +91,10 @@ export default function ListingScreen() {
                     <DetailRow icon="business" label="Стопанство" value={data.farmer.farmName} />
                   ) : null}
                 </DetailList>
+
+                {!data.isOwner && data.isSaved !== undefined ? (
+                  <SaveButton kind="LISTING" id={data.id} saved={data.isSaved} />
+                ) : null}
 
                 {data.farmer.phone ? (
                   <Button

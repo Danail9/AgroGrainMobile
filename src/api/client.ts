@@ -164,7 +164,7 @@ function headers(token?: string, hasBody = false): Record<string, string> {
 }
 
 export type RequestOptions<T> = {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   schema: z.ZodType<T>;
   /** Defaults to true. Sign-in and the public version check pass false. */

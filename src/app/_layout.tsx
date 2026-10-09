@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { APP_VERSION, STORE_URL, STRIPE_PUBLISHABLE_KEY } from "@/config";
 import { isUnsupported } from "@/lib/version";
 import { colors } from "@/theme/tokens";
+import { DialogHost } from "@/ui/Dialog";
 import { Button } from "@/ui/forms";
 import { GATE_COPY, Gate } from "@/ui/Gate";
 
@@ -69,6 +70,7 @@ export default function RootLayout() {
           >
             <StatusBar style="dark" />
             <Navigator />
+            <DialogHost />
           </StripeProvider>
         </AuthProvider>
       </PersistQueryClientProvider>

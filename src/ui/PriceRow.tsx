@@ -5,7 +5,8 @@ import type { z } from "zod";
 
 import type { priceRowSchema } from "@/api/schemas";
 import { formatNumber } from "@/lib/format";
-import { space } from "@/theme/tokens";
+import { colors, space } from "@/theme/tokens";
+import { Icon } from "@/ui/Icon";
 import { pressedStyle, ChangeBadge } from "@/ui/primitives";
 import { AppText } from "@/ui/Text";
 
@@ -17,6 +18,7 @@ export function PriceRow({
   showChange,
   compact = false,
   fullUnit = false,
+  favorite = false,
 }: {
   price: PriceRowData;
   /** Reserve the change column only when at least one row can fill it. */
@@ -24,11 +26,12 @@ export function PriceRow({
   compact?: boolean;
   /** Show "€/т" instead of the short "€" used on the cramped home card. */
   fullUnit?: boolean;
+  favorite?: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${price.name}, ${formatNumber(price.price)} евро на тон`}
+      accessibilityLabel={`${price.name}${favorite ? " (любима)" : ""}, ${formatNumber(price.price)} евро на тон`}
       onPress={() => router.push(`/market/${price.slug}`)}
       style={({ pressed }) => [
         {
@@ -41,9 +44,14 @@ export function PriceRow({
         pressed && pressedStyle,
       ]}
     >
-      <AppText variant="body" style={{ flex: 1, fontWeight: "500" }}>
-        {price.emoji} {price.name}
-      </AppText>
+      <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <AppText variant="body" style={{ flexShrink: 1, fontWeight: "500" }}>
+          {price.emoji} {price.name}
+        </AppText>
+        {favorite ? (
+          <Icon name="star" size={14} color={colors.warn} />
+        ) : null}
+      </View>
       <AppText variant="body" numeric bold style={{ fontSize: 17 }}>
         {formatNumber(price.price)}{" "}
         <AppText variant="small" tone="muted" bold>

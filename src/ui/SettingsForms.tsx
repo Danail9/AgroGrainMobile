@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Switch, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Switch, TextInput, View } from "react-native";
 
 import { isApiError } from "@/api/client";
 import {
@@ -13,11 +13,13 @@ import {
 import type { Me } from "@/api/schemas";
 import { useAuth } from "@/auth/AuthContext";
 import { normalizeDecimal } from "@/lib/forms";
-import { PHONE_CODES, splitPhone } from "@/lib/phone";
+import { PHONE_CODES, PHONE_COUNTRIES, phoneInput, splitPhone } from "@/lib/phone";
 import { disablePush, enablePush, pushSupported } from "@/lib/push";
-import { colors, space } from "@/theme/tokens";
-import { Button, ChoiceGroup, FormMessage, TextField } from "@/ui/forms";
-import { Divider } from "@/ui/primitives";
+import { colors, radius, space } from "@/theme/tokens";
+import { showDialog } from "@/ui/Dialog";
+import { Button, FormMessage, TextField } from "@/ui/forms";
+import { Icon } from "@/ui/Icon";
+import { Divider, pressedStyle } from "@/ui/primitives";
 import { RegionPicker, type RegionValue } from "@/ui/RegionPicker";
 import { AppText } from "@/ui/Text";
 
@@ -28,7 +30,7 @@ function failure(e: unknown, known: string[]): { form?: string; field?: Errors }
   return { form: isApiError(e) ? e.message : "Записът е неуспешен. Опитай отново." };
 }
 
-export function ProfileForm({ user }: { user: Me["user"] }) {
+export function ProfileForm({ user, onSaved }: { user: Me["user"]; onSaved?: () => void }) {
   const update = useUpdateProfile();
   const initial = splitPhone(user.phone);
   const [name, setName] = useState(user.name);
@@ -39,6 +41,12 @@ export function ProfileForm({ user }: { user: Me["user"] }) {
   const [success, setSuccess] = useState<string | null>(null);
   const [fields, setFields] = useState<Errors>({});
 
+  const changed =
+    name.trim() !== user.name ||
+    farmName.trim() !== (user.farmName ?? "") ||
+    phoneCode !== initial.code ||
+    phone.trim() !== initial.local;
+
   function save() {
     setError(null);
     setSuccess(null);
@@ -46,7 +54,10 @@ export function ProfileForm({ user }: { user: Me["user"] }) {
     update.mutate(
       { name, farmName, phone, phoneCode },
       {
-        onSuccess: () => setSuccess("Профилът е обновен."),
+        onSuccess: () => {
+          setSuccess("Профилът е обновен.");
+          onSaved?.();
+        },
         onError: (e) => {
           const f = failure(e, ["name", "farmName", "phone"]);
           setError(f.form ?? null);
@@ -59,28 +70,161 @@ export function ProfileForm({ user }: { user: Me["user"] }) {
   return (
     <View style={{ gap: space.md }}>
       <FormMessage error={error} success={success} />
-      <TextField label="Име и фамилия" value={name} onChangeText={setName} error={fields.name} />
       <TextField
-        label="Стопанство (по избор)"
+        label="Име и фамилия"
+        value={name}
+        onChangeText={setName}
+        autoComplete="name"
+        textContentType="name"
+        error={fields.name}
+      />
+      <TextField
+        label="Стопанство / фирма (по избор)"
         value={farmName}
         onChangeText={setFarmName}
         placeholder="ЗП Добруджа"
         error={fields.farmName}
       />
-      <ChoiceGroup
-        label="Код на държава"
-        options={PHONE_CODES.map((code) => ({ value: code, label: code }))}
-        value={phoneCode}
-        onChange={setPhoneCode}
-      />
-      <TextField
-        label="Телефон"
+      <PhoneField
+        code={phoneCode}
+        onCode={setPhoneCode}
         value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
+        onChange={setPhone}
         error={fields.phone}
       />
-      <Button title="Запази" onPress={save} loading={update.isPending} />
+      <Button
+        title={changed ? "Запази промените" : "Няма промени"}
+        icon="checkmark"
+        onPress={save}
+        loading={update.isPending}
+        disabled={!changed || !name.trim()}
+      />
+    </View>
+  );
+}
+
+/** Phone number with its dial code as a tappable prefix instead of a row of chips. */
+function PhoneField({
+  code,
+  onCode,
+  value,
+  onChange,
+  error,
+}: {
+  code: string;
+  onCode: (code: string) => void;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const country = PHONE_COUNTRIES[code];
+
+  return (
+    <View>
+      <AppText variant="caption" tone="muted" bold style={{ marginBottom: 6 }}>
+        Телефон
+      </AppText>
+      <View style={[styles.phone, focused && { borderColor: colors.brand[500] }, !!error && { borderColor: colors.down }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Код на държава ${code}. Промени`}
+          onPress={() => setOpen(true)}
+          style={({ pressed }) => [styles.codeButton, pressed && pressedStyle]}
+        >
+          <AppText style={{ fontSize: 18 }}>{country?.flag ?? "🌐"}</AppText>
+          <AppText variant="small" bold>
+            {code}
+          </AppText>
+          <Icon name="chevron-down" size={14} color={colors.muted} />
+        </Pressable>
+        <TextInput
+          accessibilityLabel="Телефон"
+          value={value}
+          onChangeText={(text) => onChange(phoneInput(text))}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder="888 123 456"
+          placeholderTextColor={colors.muted}
+          keyboardType="phone-pad"
+          autoComplete="tel"
+          textContentType="telephoneNumber"
+          maxLength={16}
+          style={styles.phoneInput}
+        />
+      </View>
+      {error ? (
+        <AppText variant="caption" tone="danger" style={{ marginTop: 4 }}>
+          {error}
+        </AppText>
+      ) : null}
+      <AppText variant="caption" tone="muted" style={{ marginTop: 4 }}>
+        Търговците виждат номера ти, за да се свържат за обявите.
+      </AppText>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable accessibilityLabel="Затвори" style={styles.backdrop} onPress={() => setOpen(false)}>
+          <View style={styles.menu}>
+            <AppText variant="small" bold style={{ padding: space.lg, paddingBottom: space.sm }}>
+              Код на държава
+            </AppText>
+            {PHONE_CODES.map((item) => {
+              const selected = item === code;
+              return (
+                <Pressable
+                  key={item}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  onPress={() => {
+                    onCode(item);
+                    setOpen(false);
+                  }}
+                  style={({ pressed }) => [styles.menuRow, pressed && pressedStyle]}
+                >
+                  <AppText style={{ fontSize: 20 }}>{PHONE_COUNTRIES[item]?.flag ?? "🌐"}</AppText>
+                  <AppText variant="small" bold={selected} style={{ flex: 1 }}>
+                    {PHONE_COUNTRIES[item]?.name ?? item}
+                  </AppText>
+                  <AppText variant="small" tone="muted" numeric>
+                    {item}
+                  </AppText>
+                  {selected ? <Icon name="checkmark" size={18} color={colors.brand[600]} /> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
+function PasswordToggle({ visible, onToggle }: { visible: boolean; onToggle: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={visible ? "Скрий паролата" : "Покажи паролата"}
+      hitSlop={8}
+      onPress={onToggle}
+      style={{ paddingHorizontal: 14 }}
+    >
+      <Icon name={visible ? "eye-off-outline" : "eye-outline"} size={20} color={colors.muted} />
+    </Pressable>
+  );
+}
+
+function Check({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      <Icon
+        name={ok ? "checkmark-circle" : "ellipse-outline"}
+        size={16}
+        color={ok ? colors.brand[600] : colors.muted}
+      />
+      <AppText variant="caption" tone={ok ? "brand" : "muted"}>
+        {label}
+      </AppText>
     </View>
   );
 }
@@ -90,10 +234,14 @@ export function PasswordForm() {
   const [current, setCurrent] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [fields, setFields] = useState<Errors>({});
+
+  const longEnough = password.length >= 8;
+  const matches = !!password && password === confirm;
 
   async function save() {
     setBusy(true);
@@ -117,6 +265,8 @@ export function PasswordForm() {
     }
   }
 
+  const toggle = <PasswordToggle visible={show} onToggle={() => setShow((value) => !value)} />;
+
   return (
     <View style={{ gap: space.md }}>
       <FormMessage error={error} success={success} />
@@ -124,34 +274,50 @@ export function PasswordForm() {
         label="Текуща парола"
         value={current}
         onChangeText={setCurrent}
-        secureTextEntry
+        secureTextEntry={!show}
         autoCapitalize="none"
+        autoComplete="current-password"
+        textContentType="password"
         placeholder="••••••••"
         error={fields.current}
+        accessory={toggle}
       />
       <TextField
         label="Нова парола"
         value={password}
         onChangeText={setPassword}
-        secureTextEntry
+        secureTextEntry={!show}
         autoCapitalize="none"
+        autoComplete="new-password"
+        textContentType="newPassword"
         placeholder="Поне 8 символа"
         error={fields.password}
+        accessory={toggle}
       />
       <TextField
         label="Повтори новата парола"
         value={confirm}
         onChangeText={setConfirm}
-        secureTextEntry
+        secureTextEntry={!show}
         autoCapitalize="none"
+        autoComplete="new-password"
+        textContentType="newPassword"
         placeholder="••••••••"
         error={fields.confirm}
+        accessory={toggle}
       />
+      {password ? (
+        <View style={{ gap: 4 }}>
+          <Check ok={longEnough} label="Поне 8 символа" />
+          <Check ok={matches} label="Паролите съвпадат" />
+        </View>
+      ) : null}
       <Button
         title="Смени паролата"
+        icon="lock-closed-outline"
         onPress={() => void save()}
         loading={busy}
-        disabled={!current || !password}
+        disabled={!current || !longEnough || !matches}
       />
       <AppText variant="caption" tone="muted">
         След смяна ще останеш вписан тук, а другите устройства ще бъдат изведени.
@@ -185,14 +351,17 @@ export function DeleteAccountForm() {
   }
 
   function confirm() {
-    Alert.alert(
-      "Изтриване на профила",
-      "Профилът и всички твои данни ще бъдат изтрити окончателно. Това не може да се върне.",
-      [
-        { text: "Отказ", style: "cancel" },
-        { text: "Изтрий", style: "destructive", onPress: () => void erase() },
+    showDialog({
+      title: "Изтриване на профила",
+      message: "Профилът и всички твои данни ще бъдат изтрити окончателно. Това не може да се върне.",
+      icon: "trash-outline",
+      tone: "danger",
+      dismissable: true,
+      actions: [
+        { label: "Отказ", style: "cancel" },
+        { label: "Изтрий", style: "destructive", onPress: () => void erase() },
       ],
-    );
+    });
   }
 
   if (!open) {
@@ -341,6 +510,14 @@ export function NotificationPrefsForm({ prefs, role }: {
         onChange={(priceMove) => save({ priceMove }, "Настройките са запазени.")}
       />
       <Divider />
+      <Toggle
+        label="Целеви цени"
+        hint="Когато култура достигне цената, която си задал в „Пазар“."
+        value={prefs.priceTarget ?? true}
+        disabled={!prefs.enabled || update.isPending}
+        onChange={(priceTarget) => save({ priceTarget }, "Настройките са запазени.")}
+      />
+      <Divider />
       <View style={{ flexDirection: "row", alignItems: "flex-end", gap: space.md, paddingVertical: 10 }}>
         <View style={{ flex: 1 }}>
           <TextField
@@ -414,6 +591,20 @@ export function NotificationPrefsForm({ prefs, role }: {
         disabled={!prefs.enabled || update.isPending}
         onChange={(newListing) => save({ newListing }, "Настройките са запазени.")}
       /> : null}
+      {role === "TRADER" ? <Toggle
+        label="Изтичащи оферти"
+        hint="Ден преди твоя оферта да изтече, за да я удължиш."
+        value={prefs.offerExpiring ?? true}
+        disabled={!prefs.enabled || update.isPending}
+        onChange={(offerExpiring) => save({ offerExpiring }, "Настройките са запазени.")}
+      /> : null}
+      <Toggle
+        label="Промени в запазени"
+        hint="Когато запазена оферта или обява бъде спряна, удължена или затворена."
+        value={prefs.savedItems ?? true}
+        disabled={!prefs.enabled || update.isPending}
+        onChange={(savedItems) => save({ savedItems }, "Настройките са запазени.")}
+      />
       </> : null}
       <Divider />
       <AppText variant="small" bold>Абонамент</AppText>
@@ -430,6 +621,15 @@ export function NotificationPrefsForm({ prefs, role }: {
         value={prefs.subscriptionReminder}
         disabled={!prefs.enabled || update.isPending}
         onChange={(subscriptionReminder) => save({ subscriptionReminder }, "Настройките са запазени.")}
+      />
+      <Divider />
+      <AppText variant="small" bold>Имейл</AppText>
+      <Toggle
+        label="Седмичен обзор"
+        hint="Всеки понеделник: цени на любимите ти култури, времето и новото в Борса."
+        value={prefs.weeklyDigest ?? true}
+        disabled={!prefs.enabled || update.isPending}
+        onChange={(weeklyDigest) => save({ weeklyDigest }, "Настройките са запазени.")}
       />
       </View>
     </View>
@@ -472,3 +672,45 @@ export function RegionForm({ user }: { user: Me["user"] }) {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  phone: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.white,
+  },
+  codeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 48,
+    paddingHorizontal: 12,
+    borderRightWidth: 1,
+    borderRightColor: colors.line,
+  },
+  phoneInput: {
+    flex: 1,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.ink,
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    padding: space.xl,
+  },
+  menu: { borderRadius: radius.lg, backgroundColor: colors.white, overflow: "hidden", paddingBottom: space.sm },
+  menuRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    paddingHorizontal: space.lg,
+    paddingVertical: 12,
+  },
+});

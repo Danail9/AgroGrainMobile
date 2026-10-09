@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -73,12 +73,15 @@ export function TextField({
   error,
   suffix,
   hint,
+  accessory,
   ...input
 }: TextInputProps & {
   label: string;
   error?: string | null;
   suffix?: string;
   hint?: string;
+  /** Inline control at the end of the input, e.g. a show-password button. */
+  accessory?: ReactNode;
 }) {
   const [focused, setFocused] = useState(false);
 
@@ -113,6 +116,7 @@ export function TextField({
             {suffix}
           </AppText>
         ) : null}
+        {accessory}
       </View>
       {error ? (
         <AppText variant="caption" tone="danger" style={{ marginTop: 4 }}>

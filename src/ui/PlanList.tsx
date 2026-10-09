@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useStripe } from "@stripe/stripe-react-native";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { z } from "zod";
 
 import { api, isApiError } from "@/api/client";
@@ -12,6 +12,7 @@ import { STRIPE_PUBLISHABLE_KEY } from "@/config";
 import { formatShortDate } from "@/lib/format";
 import { TIER_LABELS } from "@/lib/plans";
 import { colors, radius, space } from "@/theme/tokens";
+import { showDialog } from "@/ui/Dialog";
 import { Button, FormMessage } from "@/ui/forms";
 import { Icon } from "@/ui/Icon";
 import { Card, Pill, pressedStyle } from "@/ui/primitives";
@@ -111,10 +112,12 @@ export function PlanList({
       if (session.scheduledChange) {
         await plans.refetch();
         onChanged();
-        Alert.alert(
-          "Промяната е планирана",
-          `${TIER_LABELS[plan.tier]} започва на ${formatShortDate(new Date(session.scheduledChange.effectiveAt))}. Дотогава запазваш текущия си план. Няма плащане сега.`,
-        );
+        showDialog({
+          title: "Промяната е планирана",
+          message: `${TIER_LABELS[plan.tier]} започва на ${formatShortDate(new Date(session.scheduledChange.effectiveAt))}. Дотогава запазваш текущия си план. Няма плащане сега.`,
+          icon: "calendar",
+          actions: [{ label: "Разбрах", style: "primary" }],
+        });
         return;
       }
       if (!session.paymentIntentClientSecret && !session.immediateUpgrade) {
@@ -156,22 +159,26 @@ export function PlanList({
       onChanged();
 
       if (activated) {
-        Alert.alert(
-          "Успешно плащане",
-          wantsTrade
+        showDialog({
+          title: "Успешно плащане",
+          message: wantsTrade
             ? "Абонаментът ти е активен. Вече имаш достъп до Борса."
             : "Абонаментът ти е активен. Вече имаш достъп до времето, цените, новините и AI анализите.",
-          [{
-            text: wantsTrade ? "Към Борса" : "Към началото",
+          icon: "checkmark-circle",
+          tone: "success",
+          actions: [{
+            label: wantsTrade ? "Към Борса" : "Към началото",
+            style: "primary",
             onPress: () => router.replace(wantsTrade ? "/trade" : "/"),
           }],
-          { cancelable: false },
-        );
+        });
       } else {
-        Alert.alert(
-          "Плащането е прието",
-          "Активирането отнема няколко секунди. Издърпай надолу, за да обновиш.",
-        );
+        showDialog({
+          title: "Плащането е прието",
+          message: "Активирането отнема няколко секунди. Издърпай надолу, за да обновиш.",
+          icon: "time",
+          actions: [{ label: "Разбрах", style: "primary" }],
+        });
       }
     } catch (e) {
       const message = isApiError(e) || e instanceof Error ? e.message : "Плащането не успя.";
@@ -410,24 +417,28 @@ export function PlanList({
                       const switching = !!current && !current.managedByAdmin;
                       if (!switching) return void choose(plan);
                       if (canUpgrade) {
-                        Alert.alert(
-                          "Надграждане сега",
-                          `Борсата ще бъде активирана веднага след успешно плащане. Stripe ще начисли разликата за оставащия платен период от запазената карта. Новата цена е ${formatEuro(plan.priceCents)} ${plan.suffix}. Датата на подновяване остава същата.${scheduledChange ? " Това заменя планираната промяна." : ""}`,
-                          [
-                            { text: "Отказ", style: "cancel" },
-                            { text: "Надгради и плати", onPress: () => void choose(plan, true) },
+                        showDialog({
+                          title: "Надграждане сега",
+                          icon: "trending-up",
+                          dismissable: true,
+                          message: `Борсата ще бъде активирана веднага след успешно плащане. Stripe ще начисли разликата за оставащия платен период от запазената карта. Новата цена е ${formatEuro(plan.priceCents)} ${plan.suffix}. Датата на подновяване остава същата.${scheduledChange ? " Това заменя планираната промяна." : ""}`,
+                          actions: [
+                            { label: "Отказ", style: "cancel" },
+                            { label: "Надгради и плати", style: "primary", onPress: () => void choose(plan, true) },
                           ],
-                        );
+                        });
                         return;
                       }
-                      Alert.alert(
-                        "Промяна при подновяване",
-                        `„${plan.name}“ за ${formatEuro(plan.priceCents)} ${plan.suffix} ще започне след края на текущия платен период${current.currentPeriodEnd ? ` на ${formatShortDate(new Date(current.currentPeriodEnd))}` : ""}. Запазваш текущия си достъп дотогава. Няма плащане сега.${scheduledChange ? " Това заменя вече планираната промяна." : ""}`,
-                        [
-                          { text: "Отказ", style: "cancel" },
-                          { text: "Планирай промяната", onPress: () => void choose(plan) },
+                      showDialog({
+                        title: "Промяна при подновяване",
+                        icon: "calendar",
+                        dismissable: true,
+                        message: `„${plan.name}“ за ${formatEuro(plan.priceCents)} ${plan.suffix} ще започне след края на текущия платен период${current.currentPeriodEnd ? ` на ${formatShortDate(new Date(current.currentPeriodEnd))}` : ""}. Запазваш текущия си достъп дотогава. Няма плащане сега.${scheduledChange ? " Това заменя вече планираната промяна." : ""}`,
+                        actions: [
+                          { label: "Отказ", style: "cancel" },
+                          { label: "Планирай промяната", style: "primary", onPress: () => void choose(plan) },
                         ],
-                      );
+                      });
                     }}
                   />
                 </Card>

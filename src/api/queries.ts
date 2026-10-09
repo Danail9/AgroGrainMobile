@@ -14,7 +14,9 @@ import {
   cropDetailSchema,
   cropInsightSchema,
   dailySummarySchema,
+  favoritesSchema,
   homeSchema,
+  invoicesSchema,
   listingDetailSchema,
   marketResponseSchema,
   meSchema,
@@ -23,6 +25,10 @@ import {
   notificationPrefsSchema,
   notificationsSchema,
   plansSchema,
+  priceAlertResultSchema,
+  priceAlertsSchema,
+  renewalSchema,
+  savedItemsSchema,
   offerDetailSchema,
   regionsSchema,
   tradeResponseSchema,
@@ -44,7 +50,11 @@ export const keys = {
   home: ["home"] as const,
   weather: ["weather"] as const,
   market: ["market"] as const,
-  crop: (slug: string) => ["crop", slug] as const,
+  crop: (slug: string, days = 30) => ["crop", slug, days] as const,
+  cropAll: (slug: string) => ["crop", slug] as const,
+  priceAlerts: (slug: string) => ["priceAlerts", slug] as const,
+  saved: ["saved"] as const,
+  invoices: ["invoices"] as const,
   cropInsight: (slug: string) => ["crop", slug, "insight"] as const,
   news: (category: string | null) => ["news", category ?? "all"] as const,
   article: (slug: string) => ["article", slug] as const,
@@ -104,12 +114,42 @@ export const useMarket = () =>
     staleTime: 30 * MINUTE,
   });
 
-export const useCrop = (slug: string) =>
+export type HistoryDays = 30 | 90 | 365;
+
+export const useCrop = (slug: string, days: HistoryDays = 30) =>
   useQuery({
-    queryKey: keys.crop(slug),
+    queryKey: keys.crop(slug, days),
     queryFn: ({ signal }) =>
-      api(`/market/${encodeURIComponent(slug)}`, { schema: cropDetailSchema, signal }),
+      api(`/market/${encodeURIComponent(slug)}?days=${days}`, { schema: cropDetailSchema, signal }),
     staleTime: 30 * MINUTE,
+    // Switching the range keeps the screen in place while the new window loads,
+    // but another crop never borrows this one's prices.
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[1] === slug ? previous : undefined,
+  });
+
+export const usePriceAlerts = (slug: string, enabled = true) =>
+  useQuery({
+    queryKey: keys.priceAlerts(slug),
+    queryFn: ({ signal }) =>
+      api(`/market/alerts?crop=${encodeURIComponent(slug)}`, { schema: priceAlertsSchema, signal }),
+    staleTime: 5 * MINUTE,
+    enabled,
+  });
+
+export const useSavedItems = (enabled = true) =>
+  useQuery({
+    queryKey: keys.saved,
+    queryFn: ({ signal }) => api("/trade/saved", { schema: savedItemsSchema, signal }),
+    staleTime: 5 * MINUTE,
+    enabled,
+  });
+
+export const useInvoices = () =>
+  useQuery({
+    queryKey: keys.invoices,
+    queryFn: ({ signal }) => api("/subscription/invoices", { schema: invoicesSchema, signal }),
+    staleTime: 5 * MINUTE,
   });
 
 /** The model-written commentary is slow, so it loads after the rest of the screen. */
@@ -289,6 +329,17 @@ export const useToggleOffer = () =>
     (client) => invalidateTrade(client),
   );
 
+/** Re-activates an offer and pushes its end date out by a week. */
+export const useExtendOffer = () =>
+  useInvalidating(
+    (id: string) =>
+      api(`/trade/offers/${id}`, { method: "PATCH", body: { extend: true }, schema: ok }),
+    (client) => {
+      invalidateTrade(client);
+      void client.invalidateQueries({ queryKey: ["offer"] });
+    },
+  );
+
 export const useDeleteOffer = () =>
   useInvalidating(
     (id: string) => api(`/trade/offers/${id}`, { method: "DELETE", schema: ok }),
@@ -384,3 +435,83 @@ export const usePlans = () =>
     queryFn: ({ signal }) => api("/subscription/plans", { schema: plansSchema, signal }),
     staleTime: 0,
   });
+
+/* ------------------------------------------------------ engagement features */
+
+export const useSetFavorite = () => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { cropSlug: string; favorite: boolean }) =>
+      api("/me/favorites", { method: "PUT", body: input, schema: favoritesSchema }),
+    onSuccess: ({ favoriteCrops }) => {
+      client.setQueryData(keys.me, (me: z.infer<typeof meSchema> | undefined) =>
+        me ? { ...me, favoriteCrops } : me,
+      );
+      // The home screen's short price list is chosen on the server from favourites.
+      void client.invalidateQueries({ queryKey: keys.home });
+    },
+  });
+};
+
+export type PriceAlertInput = {
+  cropSlug: string;
+  direction: "ABOVE" | "BELOW";
+  targetPrice: string;
+};
+
+export const useCreatePriceAlert = () =>
+  useInvalidating(
+    (input: PriceAlertInput) =>
+      api("/market/alerts", { method: "POST", body: input, schema: priceAlertResultSchema }),
+    (client, { alert }) =>
+      void client.invalidateQueries({ queryKey: keys.priceAlerts(alert.cropSlug) }),
+  );
+
+export const useUpdatePriceAlert = () =>
+  useInvalidating(
+    (input: { id: string; isActive: boolean }) =>
+      api(`/market/alerts/${input.id}`, {
+        method: "PATCH",
+        body: { isActive: input.isActive },
+        schema: priceAlertResultSchema,
+      }),
+    (client, { alert }) =>
+      void client.invalidateQueries({ queryKey: keys.priceAlerts(alert.cropSlug) }),
+  );
+
+export const useDeletePriceAlert = () =>
+  useInvalidating(
+    (input: { id: string; cropSlug: string }) =>
+      api(`/market/alerts/${input.id}`, { method: "DELETE", schema: ok }).then(() => input),
+    (client, input) =>
+      void client.invalidateQueries({ queryKey: keys.priceAlerts(input.cropSlug) }),
+  );
+
+export const useToggleSaved = () =>
+  useInvalidating(
+    (input: { kind: "OFFER" | "LISTING"; id: string; saved: boolean }) =>
+      api("/trade/saved", { method: "POST", body: input, schema: ok }).then(() => input),
+    (client, input) => {
+      void client.invalidateQueries({ queryKey: keys.saved });
+      client.setQueryData(
+        input.kind === "OFFER" ? keys.offer(input.id) : keys.listing(input.id),
+        (detail: { isSaved?: boolean } | undefined) =>
+          detail ? { ...detail, isSaved: input.saved } : detail,
+      );
+    },
+  );
+
+/** Turns auto-renewal off (cancel at period end) or back on. */
+export const useSetRenewal = () =>
+  useInvalidating(
+    (renew: boolean) =>
+      api(renew ? "/subscription/resume" : "/subscription/cancel", {
+        method: "POST",
+        schema: renewalSchema,
+      }),
+    (client) => {
+      void client.invalidateQueries({ queryKey: keys.me });
+      void client.invalidateQueries({ queryKey: ["plans"] });
+      void client.invalidateQueries({ queryKey: keys.invoices });
+    },
+  );

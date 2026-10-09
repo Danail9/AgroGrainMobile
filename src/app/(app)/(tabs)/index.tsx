@@ -1,14 +1,17 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { Pressable, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
-import { useHome, useMe, useWeather } from "@/api/queries";
+import { keys, useHome, useMarket, useMe, useTrade, useWeather } from "@/api/queries";
 import type { Home, WeatherResponse } from "@/api/schemas";
-import { formatLongDate, formatNumber, greeting } from "@/lib/format";
-import { colors, radius, space } from "@/theme/tokens";
+import { formatLongDate, formatNumber, greeting, relativeTime, updatedAgo } from "@/lib/format";
+import { expiringSoon, expiryOf, findMarketRow, formatPrice, marketDelta, topMovers } from "@/lib/trade";
+import { colors, radius, shadowCard, space } from "@/theme/tokens";
 import { BriefingSections } from "@/ui/BriefingSections";
 import { HeaderActions } from "@/ui/HeaderActions";
-import { Icon } from "@/ui/Icon";
+import { Icon, type IconName } from "@/ui/Icon";
 import { PriceRow } from "@/ui/PriceRow";
+import { homePrices } from "@/lib/favorites";
 import {
   Card,
   Divider,
@@ -33,6 +36,7 @@ const LEVEL = {
 } as const;
 
 export default function HomeScreen() {
+  const queryClient = useQueryClient();
   const me = useMe();
   const home = useHome();
   const weather = useWeather(home.data?.role === "FARMER");
@@ -47,16 +51,17 @@ export default function HomeScreen() {
       tabbed
       title={salutation}
       wrapTitle
-      subtitle={formatLongDate()}
+      subtitle={trader && home.dataUpdatedAt ? `${formatLongDate()} · ${updatedAgo(home.dataUpdatedAt).replace("обновено ", "обн. ").replace(/минути?/, "мин")}` : formatLongDate()}
       right={<HeaderActions unreadCount={unread} news={!trader} />}
       onRefresh={() => {
         void home.refetch();
         void me.refetch();
         if (home.data?.role === "FARMER") void weather.refetch();
+        if (trader) void queryClient.invalidateQueries({ queryKey: keys.trade });
       }}
       refreshing={home.isRefetching || weather.isRefetching}
     >
-      <QueryBoundary query={home}>
+      <QueryBoundary query={home} stamp={!trader}>
         {(data) =>
           data.role === "FARMER" ? (
             <FarmerView
@@ -64,9 +69,10 @@ export default function HomeScreen() {
               canTrade={me.data?.subscription.canTrade ?? false}
               liveWeather={weather.data?.weather}
               weatherUnavailable={weather.isError && !weather.data}
+              favorites={me.data?.favoriteCrops ?? []}
             />
           ) : data.role === "TRADER" ? (
-            <TraderView data={data} />
+            <TraderView data={data} favorites={me.data?.favoriteCrops ?? []} now={home.dataUpdatedAt} />
           ) : null
         }
       </QueryBoundary>
@@ -79,17 +85,21 @@ function FarmerView({
   canTrade,
   liveWeather,
   weatherUnavailable,
+  favorites,
 }: {
   data: FarmerHome;
   canTrade: boolean;
   liveWeather?: WeatherResponse["weather"];
   weatherUnavailable: boolean;
+  favorites: string[];
 }) {
   const homeWeather = data.weather;
   const current = liveWeather?.current ?? homeWeather.current;
   const today = liveWeather?.daily[0] ?? homeWeather.today;
   const work = homeWeather.fieldWork;
-  const showChange = data.prices.some((price) => price.changePct !== null);
+  const market = useMarket();
+  const prices = homePrices(data.prices, market.data?.prices, favorites);
+  const showChange = prices.some((price) => price.changePct !== null);
   const level = work ? LEVEL[work.level] : null;
 
   return (
@@ -215,10 +225,10 @@ function FarmerView({
       <View>
         <SectionHeader title="Пазарни цени (€/т)" action="Виж всички" href="/market" />
         <RowList>
-          {data.prices.map((price, index) => (
+          {prices.map((price, index) => (
             <View key={price.slug}>
               {index > 0 ? <Divider /> : null}
-              <PriceRow price={price} showChange={showChange} compact />
+              <PriceRow price={price} showChange={showChange} compact favorite={favorites.includes(price.slug)} />
             </View>
           ))}
         </RowList>
@@ -324,78 +334,301 @@ function FarmerView({
   );
 }
 
-function TraderView({ data }: { data: TraderHome }) {
-  const showChange = data.prices.some((price) => price.changePct !== null);
+function TraderView({ data, favorites, now }: { data: TraderHome; favorites: string[]; now: number }) {
+  const market = useMarket();
+  const trade = useTrade();
+  const prices = homePrices(data.prices, market.data?.prices, favorites);
+  const showChange = prices.some((price) => price.changePct !== null && price.changePct !== 0);
+  const expiring = expiringSoon(trade.data?.myOffers ?? [], now);
+  const movers = topMovers(market.data?.prices);
 
   return (
     <>
       <View style={{ flexDirection: "row", gap: 8 }}>
-        <StatChip
-          icon={<Icon name="pricetag" size={16} color={colors.brand[600]} />}
+        <StatCard
+          icon="pricetag"
           value={formatNumber(data.stats.activeOffers)}
-          label="Активни оферти"
+          label="Мои оферти"
+          onPress={() => router.push("/trade?tab=mine")}
         />
-        <StatChip
-          icon={<Icon name="cube" size={16} color={colors.brand[600]} />}
+        <StatCard
+          icon="cube"
           value={formatNumber(data.stats.openListings)}
-          label="Отворени обяви"
+          label="Обяви от фермери"
+          onPress={() => router.push("/trade?tab=listings")}
         />
-        <StatChip
-          icon={<Icon name="swap-horizontal" size={16} color={colors.brand[600]} />}
-          value={`${formatNumber(data.stats.totalTonnage)} т`}
-          label="Общо количество"
+        <StatCard
+          icon="layers"
+          value={formatNumber(data.stats.totalTonnage)}
+          unit="т"
+          label="Предлагани"
+          onPress={() => router.push("/trade?tab=listings")}
         />
       </View>
 
+      {expiring.length ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push("/trade?tab=mine")}
+          style={({ pressed }) => [styles.alert, pressed && pressedStyle]}
+        >
+          <Icon name="time" size={22} color={colors.amber700} />
+          <View style={{ flex: 1 }}>
+            <AppText variant="small" bold style={{ color: colors.amber700 }}>
+              {expiring.length === 1
+                ? `„${expiring[0].title}“ ${expiryOf(expiring[0].validUntil, now)?.label}`
+                : `${expiring.length} оферти изтичат до 3 дни`}
+            </AppText>
+            <AppText variant="caption" style={{ color: colors.amber700 }}>
+              Удължи ги, за да ги виждат фермерите.
+            </AppText>
+          </View>
+          <Icon name="chevron-forward" size={18} color={colors.amber700} />
+        </Pressable>
+      ) : null}
+
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        <QuickAction icon="add-circle" label="Нова оферта" onPress={() => router.push("/trade?tab=offers")} />
+        <QuickAction icon="sparkles" label="AI анализ" onPress={() => router.push("/ai/market")} />
+        <QuickAction icon="calculator" label="Калкулатор" onPress={() => router.push("/ai/calculator")} />
+      </View>
+
       <View>
-        <SectionHeader title="Последни обяви от фермери" action="Към борсата" href="/trade" />
+        <SectionHeader title="Нови обяви от фермери" action="Всички" href="/trade?tab=listings" />
         {data.latestListings.length ? (
           <RowList>
-            {data.latestListings.map((listing, index) => (
-              <View key={listing.id}>
-                {index > 0 ? <Divider /> : null}
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => router.push(`/trade/listings/${listing.id}`)}
-                  style={({ pressed }) => [{ padding: space.lg, gap: 2 }, pressed && pressedStyle]}
-                >
-                  <View style={{ flexDirection: "row", gap: space.sm }}>
-                    <AppText variant="small" bold numberOfLines={1} style={{ flex: 1 }}>
-                      {listing.title}
-                    </AppText>
-                    <AppText variant="small" bold numeric>
-                      {formatNumber(listing.quantityT)} т
-                    </AppText>
-                  </View>
-                  <AppText variant="caption" tone="muted" numberOfLines={1}>
-                    {listing.farmer?.farmName || listing.farmer?.name || "Фермер"}
-                    {listing.askPrice ? ` · ${formatNumber(listing.askPrice, 2)} ${listing.unit}` : ""}
-                  </AppText>
-                </Pressable>
-              </View>
-            ))}
+            {data.latestListings.map((listing, index) => {
+              const row = findMarketRow(listing.title, market.data?.prices);
+              const delta = listing.askPrice ? marketDelta(listing.askPrice, listing.unit, row) : null;
+              return (
+                <View key={listing.id}>
+                  {index > 0 ? <Divider /> : null}
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => router.push(`/trade/listings/${listing.id}`)}
+                    style={({ pressed }) => [styles.listing, pressed && pressedStyle]}
+                  >
+                    <View style={styles.emoji}>
+                      <AppText style={{ fontSize: 20 }}>{row?.emoji ?? "🌾"}</AppText>
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <View style={{ flexDirection: "row", gap: space.sm }}>
+                        <AppText variant="small" bold numberOfLines={1} style={{ flex: 1 }}>
+                          {listing.title}
+                        </AppText>
+                        <AppText variant="small" bold numeric>
+                          {formatNumber(listing.quantityT)} т
+                        </AppText>
+                      </View>
+                      <AppText variant="caption" tone="muted" numberOfLines={1}>
+                        {listing.farmer?.farmName || listing.farmer?.name || "Фермер"} ·{" "}
+                        {relativeTime(new Date(listing.createdAt), new Date(now))}
+                      </AppText>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <AppText variant="caption" bold numeric>
+                          {listing.askPrice ? formatPrice(listing.askPrice, listing.unit) : "Цена по договаряне"}
+                        </AppText>
+                        {delta !== null && Math.abs(delta) >= 0.5 ? (
+                          <AppText variant="caption" bold style={{ color: delta > 0 ? colors.down : colors.up }}>
+                            {delta > 0 ? "+" : "−"}
+                            {formatNumber(Math.abs(delta), 0)}% {delta > 0 ? "над" : "под"} пазара
+                          </AppText>
+                        ) : null}
+                      </View>
+                      {specsLine(listing) ? (
+                        <AppText variant="caption" tone="muted" numberOfLines={1}>
+                          {specsLine(listing)}
+                        </AppText>
+                      ) : null}
+                    </View>
+                    <Icon name="chevron-forward" size={18} color={colors.muted} />
+                  </Pressable>
+                </View>
+              );
+            })}
           </RowList>
         ) : (
-          <Card>
+          <Card style={{ alignItems: "center", gap: 6, paddingVertical: space.xl }}>
+            <Icon name="cube-outline" size={28} color={colors.muted} />
             <AppText variant="small" tone="muted" align="center">
-              Все още няма отворени обяви.
+              Все още няма отворени обяви. Ще те известим, когато фермер публикува.
             </AppText>
           </Card>
         )}
       </View>
 
+      {movers.length ? (
+        <View>
+          <SectionHeader title="Движение днес" action="AI анализ" href="/ai/market" />
+          <RowList>
+            {movers.map((row, index) => {
+              const up = (row.changePct ?? 0) > 0;
+              return (
+                <View key={row.slug}>
+                  {index > 0 ? <Divider /> : null}
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => router.push(`/market/${row.slug}`)}
+                    style={({ pressed }) => [styles.mover, pressed && pressedStyle]}
+                  >
+                    <View style={[styles.trend, { backgroundColor: up ? colors.brand[50] : colors.red50 }]}>
+                      <Icon name={up ? "trending-up" : "trending-down"} size={18} color={up ? colors.up : colors.down} />
+                    </View>
+                    <AppText variant="small" bold numberOfLines={1} style={{ flex: 1 }}>
+                      {row.emoji ? `${row.emoji} ` : ""}
+                      {row.name}
+                    </AppText>
+                    <View style={{ alignItems: "flex-end" }}>
+                      <AppText variant="small" bold numeric>
+                        {formatPrice(row.price, row.unit)}
+                      </AppText>
+                      <AppText variant="caption" bold numeric style={{ color: up ? colors.up : colors.down }}>
+                        {up ? "+" : "−"}
+                        {formatNumber(Math.abs(row.changePct ?? 0), 1)}%
+                      </AppText>
+                    </View>
+                  </Pressable>
+                </View>
+              );
+            })}
+          </RowList>
+        </View>
+      ) : null}
+
       <View>
-        <SectionHeader title="Пазарни цени (€/т)" action="Виж всички" href="/market" />
+        <SectionHeader title="Пазарни цени" action="Виж всички" href="/market" />
         <RowList>
-          {data.prices.map((price, index) => (
+          {prices.map((price, index) => (
             <View key={price.slug}>
               {index > 0 ? <Divider /> : null}
-              <PriceRow price={price} showChange={showChange} compact />
+              <PriceRow
+                price={price}
+                showChange={showChange}
+                compact
+                fullUnit
+                favorite={favorites.includes(price.slug)}
+              />
             </View>
           ))}
         </RowList>
       </View>
-
     </>
   );
 }
+
+function specsLine(listing: { hectolitre: number | null; protein: number | null; gluten: number | null }) {
+  return [
+    listing.hectolitre !== null ? `${formatNumber(listing.hectolitre)} кг/хл` : null,
+    listing.protein !== null ? `протеин ${formatNumber(listing.protein)}%` : null,
+    listing.gluten !== null ? `глутен ${formatNumber(listing.gluten)}%` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function StatCard({
+  icon,
+  value,
+  unit,
+  label,
+  onPress,
+}: {
+  icon: IconName;
+  value: string;
+  unit?: string;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value}${unit ? ` ${unit}` : ""}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.stat, pressed && pressedStyle]}
+    >
+      <View style={styles.statIcon}>
+        <Icon name={icon} size={16} color={colors.brand[600]} />
+      </View>
+      <AppText variant="title" numeric style={{ fontSize: 22 }}>
+        {value}
+        {unit ? (
+          <AppText variant="small" tone="muted" bold>
+            {" "}
+            {unit}
+          </AppText>
+        ) : null}
+      </AppText>
+      <AppText variant="caption" tone="muted" numberOfLines={1}>
+        {label}
+      </AppText>
+    </Pressable>
+  );
+}
+
+function QuickAction({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.action, pressed && pressedStyle]}
+    >
+      <Icon name={icon} size={18} color={colors.brand[700]} />
+      <AppText variant="caption" bold numberOfLines={1} style={{ color: colors.brand[800] }}>
+        {label}
+      </AppText>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  stat: {
+    flex: 1,
+    gap: 4,
+    padding: 12,
+    borderRadius: radius.lg,
+    backgroundColor: colors.white,
+    ...shadowCard,
+  },
+  statIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: colors.brand[50],
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
+  },
+  alert: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    padding: space.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    backgroundColor: colors.amber50,
+  },
+  action: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.brand[200],
+    backgroundColor: colors.brand[50],
+  },
+  listing: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.lg },
+  emoji: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.soft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mover: { flexDirection: "row", alignItems: "center", gap: space.md, paddingHorizontal: space.lg, paddingVertical: 12 },
+  trend: { width: 32, height: 32, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
+});

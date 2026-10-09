@@ -19,7 +19,7 @@ const TONE: Record<Tone, string> = {
 const VARIANT: Record<Variant, TextStyle> = {
   hero: { fontSize: fontSize.hero, fontWeight: "700", letterSpacing: -0.5 },
   title: { fontSize: fontSize.xxl, fontWeight: "700", letterSpacing: -0.3 },
-  heading: { fontSize: fontSize.md, fontWeight: "600", letterSpacing: -0.1 },
+  heading: { fontSize: fontSize.md, fontWeight: "700", letterSpacing: -0.1 },
   body: { fontSize: fontSize.md, fontWeight: "400" },
   small: { fontSize: fontSize.sm, fontWeight: "400" },
   caption: { fontSize: fontSize.xs, fontWeight: "400" },

@@ -1,13 +1,13 @@
 import { router } from "expo-router";
-import { Pressable, View } from "react-native";
-
-import { useNews } from "@/api/queries";
+import { Image, Pressable, StyleSheet, View } from "react-native";
 import type { z } from "zod";
 
+import { useNews } from "@/api/queries";
 import type { newsListItemSchema } from "@/api/schemas";
 import { relativeTime } from "@/lib/format";
-import { space } from "@/theme/tokens";
-import { EmptyState, Pill, pressedStyle, Card } from "@/ui/primitives";
+import { groupNewsByDay } from "@/lib/news";
+import { colors, radius, shadowCard, space } from "@/theme/tokens";
+import { EmptyState, pressedStyle } from "@/ui/primitives";
 import { QueryBoundary } from "@/ui/QueryBoundary";
 import { Screen } from "@/ui/Screen";
 import { Tabs } from "@/ui/Tabs";
@@ -15,60 +15,118 @@ import { AppText } from "@/ui/Text";
 
 type Article = z.infer<typeof newsListItemSchema>;
 
-const CATEGORY_STYLE: Record<Article["category"], { emoji: string; color: string; label: string }> = {
-  TOP: { emoji: "⭐", color: "#22733e", label: "Важно" },
-  BULGARIA: { emoji: "🌾", color: "#d97706", label: "България" },
-  EU: { emoji: "🇪🇺", color: "#3b82f6", label: "ЕС" },
-  MARKET: { emoji: "📈", color: "#10b981", label: "Пазар" },
+const CATEGORY_STYLE: Record<Article["category"], { emoji: string; color: string; soft: string; label: string }> = {
+  TOP: { emoji: "⭐", color: "#22733e", soft: "#e8f5ec", label: "Важно" },
+  BULGARIA: { emoji: "🌾", color: "#b45309", soft: "#fef3e2", label: "България" },
+  EU: { emoji: "🇪🇺", color: "#2563eb", soft: "#e8f0fe", label: "ЕС" },
+  MARKET: { emoji: "📈", color: "#047857", soft: "#e3f7ef", label: "Пазар" },
 };
 
-function NewsList({ items }: { items: Article[] }) {
+const open = (article: Article) => router.push(`/news/${article.slug}`);
+
+function Meta({ article, now }: { article: Article; now: number }) {
+  const style = CATEGORY_STYLE[article.category];
+  return (
+    <View style={styles.meta}>
+      <AppText variant="caption" bold style={{ color: style.color }}>
+        {style.label}
+      </AppText>
+      <AppText variant="caption" tone="muted">
+        ·
+      </AppText>
+      <AppText variant="caption" tone="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
+        {article.source ? `${article.source} · ` : ""}
+        {relativeTime(new Date(article.publishedAt), new Date(now))}
+      </AppText>
+    </View>
+  );
+}
+
+/** The newest story, larger, so the most important news is read first. */
+function Featured({ article, now }: { article: Article; now: number }) {
+  const style = CATEGORY_STYLE[article.category];
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Водеща новина: ${article.title}`}
+      onPress={() => open(article)}
+      style={({ pressed }) => [styles.featured, pressed && pressedStyle]}
+    >
+      {article.imageUrl ? (
+        <Image source={{ uri: article.imageUrl }} style={styles.featuredImage} resizeMode="cover" accessibilityIgnoresInvertColors />
+      ) : (
+        <View style={[styles.featuredImage, styles.featuredPlaceholder, { backgroundColor: style.soft }]}>
+          <AppText style={{ fontSize: 44 }}>{style.emoji}</AppText>
+        </View>
+      )}
+      <View style={{ padding: space.lg, gap: 6 }}>
+        <View style={[styles.badge, { backgroundColor: style.soft }]}>
+          <AppText variant="caption" bold style={{ color: style.color }}>
+            Водеща новина
+          </AppText>
+        </View>
+        <AppText variant="heading" bold numberOfLines={3}>
+          {article.title}
+        </AppText>
+        <AppText variant="small" tone="muted" numberOfLines={3}>
+          {article.summary}
+        </AppText>
+        <Meta article={article} now={now} />
+      </View>
+    </Pressable>
+  );
+}
+
+function Row({ article, now, first }: { article: Article; now: number; first: boolean }) {
+  const style = CATEGORY_STYLE[article.category];
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={article.title}
+      onPress={() => open(article)}
+      style={({ pressed }) => [styles.row, !first && styles.divider, pressed && pressedStyle]}
+    >
+      <View style={{ flex: 1, gap: 4 }}>
+        <Meta article={article} now={now} />
+        <AppText variant="small" bold numberOfLines={3}>
+          {article.title}
+        </AppText>
+        <AppText variant="caption" tone="muted" numberOfLines={2}>
+          {article.summary}
+        </AppText>
+      </View>
+      {article.imageUrl ? (
+        <Image source={{ uri: article.imageUrl }} style={styles.thumb} resizeMode="cover" accessibilityIgnoresInvertColors />
+      ) : (
+        <View style={[styles.thumb, styles.featuredPlaceholder, { backgroundColor: style.soft }]}>
+          <AppText style={{ fontSize: 24 }}>{style.emoji}</AppText>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+function NewsList({ items, now, featured }: { items: Article[]; now: number; featured: boolean }) {
   if (!items.length) {
-    return <EmptyState title="Няма новини" description="Няма новини в тази категория." />;
+    return <EmptyState title="Няма новини" description="Все още няма новини в тази категория. Дръпни надолу, за да провериш отново." />;
   }
 
+  const [lead, ...rest] = featured ? items : [undefined, ...items];
   return (
-    <View style={{ gap: space.md }}>
-      {items.map((article) => {
-        const style = CATEGORY_STYLE[article.category];
-        return (
-          <Pressable
-            key={article.slug}
-            accessibilityRole="button"
-            onPress={() => router.push(`/news/${article.slug}`)}
-            style={({ pressed }) => pressed && pressedStyle}
-          >
-            <Card style={{ flexDirection: "row", gap: space.md, padding: 12 }}>
-              <View
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 16,
-                  backgroundColor: style.color,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <AppText style={{ fontSize: 26 }}>{style.emoji}</AppText>
-              </View>
-              <View style={{ flex: 1, gap: 4 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Pill tone="brand">{style.label}</Pill>
-                  <AppText variant="caption" tone="muted">
-                    {relativeTime(new Date(article.publishedAt))}
-                  </AppText>
-                </View>
-                <AppText variant="small" bold>
-                  {article.title}
-                </AppText>
-                <AppText variant="caption" tone="muted" numberOfLines={2}>
-                  {article.summary}
-                </AppText>
-              </View>
-            </Card>
-          </Pressable>
-        );
-      })}
+    <View style={{ gap: space.lg }}>
+      {lead ? <Featured article={lead} now={now} /> : null}
+      {groupNewsByDay(rest as Article[], now).map((group) => (
+        <View key={group.title} style={{ gap: 6 }}>
+          <AppText variant="caption" tone="muted" bold style={styles.groupTitle}>
+            {group.title}
+          </AppText>
+          <View style={styles.group}>
+            {group.items.map((article, index) => (
+              <Row key={article.slug} article={article} now={now} first={index === 0} />
+            ))}
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -79,6 +137,7 @@ export default function NewsScreen() {
   return (
     <Screen
       tabbed
+      back="/"
       title="Агро новини"
       subtitle="Само най-важното, без излишен шум"
       onRefresh={() => void news.refetch()}
@@ -86,15 +145,23 @@ export default function NewsScreen() {
     >
       <QueryBoundary query={news}>
         {({ items }) => {
+          const now = news.dataUpdatedAt;
           const filter = (category: Article["category"]) =>
             items.filter((article) => article.category === category);
+          const tab = (key: string, label: string, list: Article[], featured = false) => ({
+            key,
+            label,
+            count: key === "top" ? undefined : list.length,
+            content: <NewsList items={list} now={now} featured={featured} />,
+          });
           return (
             <Tabs
+              variant="segmented"
               items={[
-                { key: "top", label: "Най-важното", content: <NewsList items={items} /> },
-                { key: "bg", label: "България", content: <NewsList items={filter("BULGARIA")} /> },
-                { key: "eu", label: "ЕС", content: <NewsList items={filter("EU")} /> },
-                { key: "market", label: "Пазар", content: <NewsList items={filter("MARKET")} /> },
+                tab("top", "Всички", items, true),
+                tab("bg", "България", filter("BULGARIA")),
+                tab("eu", "ЕС", filter("EU")),
+                tab("market", "Пазар", filter("MARKET")),
               ]}
             />
           );
@@ -103,3 +170,21 @@ export default function NewsScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  meta: { flexDirection: "row", alignItems: "center", gap: 6 },
+  featured: {
+    borderRadius: radius.lg,
+    backgroundColor: colors.white,
+    overflow: "hidden",
+    ...shadowCard,
+  },
+  featuredImage: { width: "100%", height: 160 },
+  featuredPlaceholder: { alignItems: "center", justifyContent: "center" },
+  badge: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
+  groupTitle: { textTransform: "uppercase", letterSpacing: 0.5, marginLeft: 4 },
+  group: { borderRadius: radius.lg, backgroundColor: colors.white, overflow: "hidden", ...shadowCard },
+  row: { flexDirection: "row", gap: space.md, padding: space.lg, alignItems: "flex-start" },
+  divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  thumb: { width: 72, height: 72, borderRadius: radius.md },
+});
