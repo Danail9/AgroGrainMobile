@@ -37,6 +37,7 @@ export const subscriptionSchema = z.object({
   canTrade: z.boolean(),
   exempt: z.boolean(),
   freeAccess: z.boolean(),
+  individualFreeAccess: z.boolean().optional(),
   status: z.enum(["NONE", "INCOMPLETE", "ACTIVE", "PAST_DUE", "CANCELED"]),
   interval: z.enum(["MONTH", "YEAR"]).nullable(),
   tier: z.enum(["BASE", "TRADER"]).nullable(),
@@ -57,11 +58,16 @@ export const checkoutSchema = z.object({
   /** Null for a scheduled change: no payment is collected now. */
   paymentIntentClientSecret: z.string().nullable(),
   scheduledChange: scheduledChangeSchema.nullable().optional(),
+  prepaidPeriods: z.array(z.object({
+    interval: z.enum(["MONTH", "YEAR"]), tier: z.enum(["BASE", "TRADER"]),
+    periodStart: isoDate, periodEnd: isoDate,
+  })).optional(),
 });
 
 export const plansSchema = z.object({
   supportsImmediateUpgrades: z.boolean().optional(),
   supportsScheduledChanges: z.boolean().optional(),
+  individualFreeAccess: z.boolean().optional(),
   scheduledChange: scheduledChangeSchema.nullable().optional(),
   /** The tier that matches the account type; the screen highlights it. */
   recommendedTier: z.enum(["BASE", "TRADER"]),
@@ -72,6 +78,7 @@ export const plansSchema = z.object({
       currentPeriodEnd: isoDate.nullable(),
       cancelAtPeriodEnd: z.boolean(),
       managedByAdmin: z.boolean(),
+      paymentMethod: z.enum(["STRIPE", "COMPLIMENTARY", "BANK_TRANSFER"]).nullable().optional(),
     })
     .nullable(),
   plans: z.array(
@@ -94,6 +101,10 @@ export const notificationPrefsSchema = z.object({
   newListing: z.boolean(),
   subscriptionUpgrade: z.boolean(),
   subscriptionReminder: z.boolean(),
+  priceTarget: z.boolean().optional(),
+  offerExpiring: z.boolean().optional(),
+  savedItems: z.boolean().optional(),
+  weeklyDigest: z.boolean().optional(),
   priceMove: z.boolean(),
   priceThreshold: z.number(),
   heavyRain: z.boolean(),
@@ -108,6 +119,8 @@ export const meSchema = z.object({
   subscription: subscriptionSchema,
   unreadCount: z.number().int(),
   notificationPrefs: notificationPrefsSchema,
+  /** Followed crop slugs, in the order they were added. */
+  favoriteCrops: z.array(z.string()).optional(),
   flags: z.object({
     freeAccessEnabled: z.boolean(),
     freeAccessTrade: z.boolean(),
@@ -317,6 +330,10 @@ export const marketResponseSchema = z.object({
 export const cropDetailSchema = z.object({
   crop: priceRowSchema,
   history: z.array(z.object({ date: isoDate, price: z.number() })),
+  /** The window `history` covers: 30, 90 or 365 days. */
+  days: z.number().int().optional(),
+  /** The same window a year earlier, dates moved forward a year to overlay. */
+  previousYear: z.array(z.object({ date: isoDate, price: z.number() })).optional(),
   related: z.array(priceRowSchema),
   analysis: z.object({
     headline: z.string(),
@@ -436,6 +453,7 @@ export const offerDetailSchema = z.object({
   createdAt: isoDate,
   isActive: z.boolean(),
   isOwner: z.boolean(),
+  isSaved: z.boolean().optional(),
   trader: z.object({
     name: z.string(),
     farmName: z.string().nullable(),
@@ -458,6 +476,7 @@ export const listingDetailSchema = z.object({
   gluten: z.number().nullable(),
   createdAt: isoDate,
   isOwner: z.boolean(),
+  isSaved: z.boolean().optional(),
   farmer: z.object({
     name: z.string(),
     farmName: z.string().nullable(),
@@ -505,11 +524,62 @@ export const homeSchema = z.discriminatedUnion("role", [
   adminHomeSchema,
 ]);
 
+/* ------------------------------------------------- alerts, saved, billing */
+
+export const favoritesSchema = z.object({ favoriteCrops: z.array(z.string()) });
+
+export const priceAlertSchema = z.object({
+  id: z.string(),
+  cropSlug: z.string(),
+  direction: z.enum(["ABOVE", "BELOW"]),
+  targetPrice: z.number(),
+  isActive: z.boolean(),
+  triggeredAt: isoDate.nullable(),
+  createdAt: isoDate,
+});
+
+export const priceAlertsSchema = z.object({ alerts: z.array(priceAlertSchema) });
+export const priceAlertResultSchema = z.object({ alert: priceAlertSchema });
+
+export const savedItemsSchema = z.object({
+  items: z.array(
+    z.object({
+      kind: z.enum(["OFFER", "LISTING"]),
+      id: z.string(),
+      title: z.string(),
+      price: z.number().nullable(),
+      unit: z.string(),
+      isOpen: z.boolean(),
+      savedAt: isoDate,
+    }),
+  ),
+});
+
+export const invoicesSchema = z.object({
+  invoices: z.array(
+    z.object({
+      id: z.string(),
+      number: z.string().nullable(),
+      status: z.enum(["paid", "open", "void", "uncollectible", "draft"]),
+      amountCents: z.number().int(),
+      currency: z.string(),
+      createdAt: isoDate,
+      description: z.string().nullable(),
+      hostedUrl: z.string().nullable(),
+      pdfUrl: z.string().nullable(),
+      source: z.enum(["STRIPE", "BANK_TRANSFER"]),
+    }),
+  ),
+});
+
+export const renewalSchema = z.object({ cancelAtPeriodEnd: z.boolean() });
+
 /* ---------------------------------------------------------- notifications */
 
 export const notificationTypeSchema = z.enum([
   "SUBSCRIPTION_UPGRADED",
   "SUBSCRIPTION_REMINDER",
+  "SUBSCRIPTION_EXPIRED",
   "PRICE_MOVE",
   "HEAVY_RAIN",
   "FROST",
@@ -517,6 +587,9 @@ export const notificationTypeSchema = z.enum([
   "GOOD_FIELD_WORK",
   "NEW_LISTING",
   "NEW_OFFER",
+  "PRICE_TARGET",
+  "OFFER_EXPIRING",
+  "SAVED_ITEM_UPDATE",
 ]);
 
 export const notificationsSchema = z.object({

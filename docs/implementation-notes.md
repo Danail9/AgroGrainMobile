@@ -160,6 +160,7 @@ Code is in place and covered by unit tests where the logic is pure; none of it h
 | Voice input | `src/ui/VoiceButton.tsx`, `src/lib/voice.ts` | A development build (`expo-speech-recognition` is native). Hidden in Expo Go. |
 | EAS profiles | `eas.json` | `eas init` to create the project, then `eas build`. |
 | CI | `../.github/workflows/ci.yml` | Typecheck, lint, tests for both projects and a schema-copy drift check. Move it to the repo root if the repo is split. |
+| Engagement features | `src/app/(app)/market/[crop].tsx` (favourite star, 30/90/365-day range, last-year overlay via `buildComparisonChart`/`yearOverYear`, `PriceAlerts`), `SaveButton` + "Удължи с 7 дни" on trade details, "Запазени" tab on Борса, `BillingManagement` (renewal + invoices) on Абонамент, profit calculator in `src/lib/calculators.ts`, `src/ui/Dialog.tsx` replacing `Alert.alert` | Portal migration `20261009090000_engagement_features` and the cron workflow secrets. Builds older than this parse the notification type enum strictly, so new types may fail their notifications list until users update. |
 
 ## Known issues and decisions to make
 

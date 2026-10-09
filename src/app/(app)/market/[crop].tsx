@@ -1,11 +1,15 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, Pressable, Switch, View } from "react-native";
 
 import { isApiError } from "@/api/client";
-import { useCrop, useCropInsight } from "@/api/queries";
+import { type HistoryDays, useCrop, useCropInsight, useMe, useSetFavorite } from "@/api/queries";
+import { canCompare, yearOverYear } from "@/lib/chart";
 import { formatNumber } from "@/lib/format";
 import { colors, radius, space } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
+import { showDialog } from "@/ui/Dialog";
+import { PriceAlerts } from "@/ui/PriceAlerts";
 import { PriceChart } from "@/ui/PriceChart";
 import { PriceRow } from "@/ui/PriceRow";
 import {
@@ -21,9 +25,36 @@ import { ErrorState, QueryBoundary } from "@/ui/QueryBoundary";
 import { Screen } from "@/ui/Screen";
 import { AppText } from "@/ui/Text";
 
+const RANGES: { days: HistoryDays; label: string; caption: string }[] = [
+  { days: 30, label: "30 дни", caption: "Последните 30 дни" },
+  { days: 90, label: "90 дни", caption: "Последните 3 месеца" },
+  { days: 365, label: "1 година", caption: "Последната година" },
+];
+
 export default function CropScreen() {
   const { crop: slug } = useLocalSearchParams<{ crop: string }>();
-  const crop = useCrop(slug);
+  const [days, setDays] = useState<HistoryDays>(30);
+  const [compare, setCompare] = useState(false);
+  const crop = useCrop(slug, days);
+  const me = useMe();
+  const setFavorite = useSetFavorite();
+  const favorite = me.data?.favoriteCrops?.includes(slug) ?? false;
+  const range = RANGES.find((item) => item.days === days) ?? RANGES[0];
+
+  function toggleFavorite() {
+    setFavorite.mutate(
+      { cropSlug: slug, favorite: !favorite },
+      {
+        onError: (e) =>
+          showDialog({
+            title: "Не успяхме да запазим любимите",
+            message: isApiError(e) ? e.message : "Опитай отново.",
+            tone: "danger",
+            icon: "alert-circle-outline",
+          }),
+      },
+    );
+  }
 
   return (
     <Screen
@@ -42,6 +73,9 @@ export default function CropScreen() {
         <QueryBoundary query={crop}>
           {(data) => {
             const showChange = data.related.some((price) => price.changePct !== null);
+            const yoy = data.previousYear ? yearOverYear(data.history, data.previousYear) : null;
+            const comparable = canCompare(data.history, data.previousYear);
+            const comparing = compare && comparable;
             return (
               <>
                 <Card>
@@ -56,7 +90,27 @@ export default function CropScreen() {
                       </AppText>
                     </View>
                     <ChangeBadge value={data.crop.changePct} />
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={favorite ? "Премахни от любими" : "Добави в любими"}
+                      accessibilityState={{ selected: favorite, busy: setFavorite.isPending }}
+                      disabled={setFavorite.isPending || !me.data}
+                      hitSlop={10}
+                      onPress={toggleFavorite}
+                      style={({ pressed }) => [{ padding: 4 }, pressed && pressedStyle]}
+                    >
+                      <Icon
+                        name={favorite ? "star" : "star-outline"}
+                        size={24}
+                        color={favorite ? colors.warn : colors.muted}
+                      />
+                    </Pressable>
                   </View>
+                  {favorite ? (
+                    <AppText variant="caption" tone="muted" style={{ marginTop: 8 }}>
+                      Любима култура — показва се първа и алармите за промяна в цените следят само любимите.
+                    </AppText>
+                  ) : null}
                   {data.crop.overridden ? (
                     <AppText variant="caption" tone="muted" style={{ marginTop: 8 }}>
                       Цената е ръчно коригирана от администратор.
@@ -77,14 +131,85 @@ export default function CropScreen() {
                       Движение на цената
                     </AppText>
                     <AppText variant="caption" tone="muted">
-                      Последните 30 дни
+                      {range.caption}
                     </AppText>
                   </View>
+                  <View
+                    accessibilityRole="tablist"
+                    style={{ flexDirection: "row", gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.md }}
+                  >
+                    {RANGES.map((item) => {
+                      const selected = item.days === days;
+                      return (
+                        <Pressable
+                          key={item.days}
+                          accessibilityRole="tab"
+                          accessibilityState={{ selected }}
+                          onPress={() => setDays(item.days)}
+                          style={({ pressed }) => [
+                            {
+                              flex: 1,
+                              alignItems: "center",
+                              paddingVertical: 8,
+                              borderRadius: radius.md,
+                              backgroundColor: selected ? colors.brand[600] : colors.soft,
+                            },
+                            pressed && pressedStyle,
+                          ]}
+                        >
+                          <AppText variant="caption" bold style={{ color: selected ? colors.white : colors.muted }}>
+                            {item.label}
+                          </AppText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                   <Divider />
-                  <View style={{ paddingTop: space.md }}>
-                    <PriceChart points={data.history} unit={data.crop.unit} />
+                  <View style={{ paddingTop: space.md, opacity: crop.isPlaceholderData ? 0.5 : 1 }}>
+                    <PriceChart
+                      points={data.history}
+                      unit={data.crop.unit}
+                      compare={comparing ? data.previousYear ?? [] : undefined}
+                    />
+                  </View>
+                  <Divider />
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: space.md,
+                      paddingHorizontal: space.lg,
+                      paddingVertical: space.md,
+                    }}
+                  >
+                    <View style={{ flex: 1, opacity: comparable ? 1 : 0.6 }}>
+                      <AppText variant="small" bold tone={comparable ? "ink" : "muted"}>
+                        Сравни с миналата година
+                      </AppText>
+                      <AppText variant="caption" tone="muted">
+                        {!comparable
+                          ? "Недостъпно — няма цени от миналата година за този период."
+                          : yoy === null
+                            ? "Линията показва цените от същия период миналата година."
+                            : `Спрямо същия ден миналата година: ${yoy > 0 ? "+" : ""}${formatNumber(yoy, 1)}%`}
+                      </AppText>
+                    </View>
+                    {comparable ? null : <Icon name="lock-closed" size={16} color={colors.muted} />}
+                    <Switch
+                      accessibilityLabel="Сравни с миналата година"
+                      accessibilityState={{ disabled: !comparable }}
+                      disabled={!comparable}
+                      value={comparing}
+                      onValueChange={setCompare}
+                      trackColor={{ true: colors.brand[500], false: colors.line }}
+                      thumbColor={colors.white}
+                    />
                   </View>
                 </Card>
+
+                {me.data?.subscription.active ? (
+                  <PriceAlerts slug={slug} price={data.crop.price} unit={data.crop.unit} />
+                ) : null}
 
                 <Analysis slug={slug} headline={data.analysis.headline} />
 

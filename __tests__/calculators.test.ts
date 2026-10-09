@@ -34,8 +34,9 @@ describe("number parsing", () => {
 });
 
 describe("calculators (default values, checked by hand)", () => {
-  it("has the six calculators of the portal", () => {
+  it("has the profit calculator plus the six calculators of the portal", () => {
     expect(CALCULATORS.map((c) => c.key)).toEqual([
+      "profit",
       "seeds",
       "fertilizer",
       "spray",

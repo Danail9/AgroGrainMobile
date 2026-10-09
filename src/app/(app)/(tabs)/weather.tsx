@@ -25,6 +25,7 @@ export default function WeatherScreen() {
   return (
     <Screen
       tabbed
+      back="/"
       title="Време"
       subtitle={regionName ? `Прогноза за ${regionName}` : undefined}
       onRefresh={() => void weather.refetch()}

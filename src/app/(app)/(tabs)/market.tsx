@@ -9,6 +9,7 @@ import { colors, radius, space } from "@/theme/tokens";
 import { FertilizerMarket } from "@/ui/FertilizerMarket";
 import { Icon, type IconName } from "@/ui/Icon";
 import { PriceRow } from "@/ui/PriceRow";
+import { favoritesFirst } from "@/lib/favorites";
 import { Card, Divider, EmptyState, RowList, pressedStyle } from "@/ui/primitives";
 import { QueryBoundary } from "@/ui/QueryBoundary";
 import { Screen } from "@/ui/Screen";
@@ -39,6 +40,7 @@ export default function MarketScreen() {
   return (
     <Screen
       tabbed
+      back="/"
       title="Пазар"
       subtitle={me.data ? `Актуални изкупни цени · ${me.data.user.regionName}` : undefined}
       onRefresh={() => void market.refetch()}
@@ -101,7 +103,7 @@ export default function MarketScreen() {
           section === "fertilizer" ? (
             <FertilizerMarket offers={data.fertilizers} />
           ) : (
-            <Grain data={data} />
+            <Grain data={data} favorites={me.data?.favoriteCrops ?? []} />
           )
         }
       </QueryBoundary>
@@ -109,17 +111,20 @@ export default function MarketScreen() {
   );
 }
 
-function Grain({ data }: { data: Market }) {
+function Grain({ data, favorites }: { data: Market; favorites: string[] }) {
   return (
     <Tabs
       items={CATEGORIES.map((category) => {
-        const prices = data.prices.filter((price) => price.category === category.key);
+        const prices = favoritesFirst(
+          data.prices.filter((price) => price.category === category.key),
+          favorites,
+        );
         return {
           key: category.key,
           label: category.label,
           content: (
             <View style={{ gap: space.lg }}>
-              <PriceList prices={prices} />
+              <PriceList prices={prices} favorites={favorites} />
               <Pressable
                 accessibilityRole="button"
                 onPress={() => router.push("/ai/market")}
@@ -158,7 +163,7 @@ function Grain({ data }: { data: Market }) {
   );
 }
 
-function PriceList({ prices }: { prices: PriceRowData[] }) {
+function PriceList({ prices, favorites }: { prices: PriceRowData[]; favorites: string[] }) {
   if (!prices.length) {
     return <EmptyState title="Няма данни" description="Няма данни за тази категория." />;
   }
@@ -168,7 +173,7 @@ function PriceList({ prices }: { prices: PriceRowData[] }) {
       {prices.map((price, index) => (
         <View key={price.slug}>
           {index > 0 ? <Divider /> : null}
-          <PriceRow price={price} showChange={showChange} fullUnit />
+          <PriceRow price={price} showChange={showChange} fullUnit favorite={favorites.includes(price.slug)} />
         </View>
       ))}
     </RowList>

@@ -11,6 +11,20 @@ export function normalizeDecimal(text: string) {
   return text.trim().replace(",", ".");
 }
 
+/**
+ * Keeps only what a positive number can contain while the user types:
+ * digits and one decimal separator (the first "," or "." wins), at most two
+ * decimals. Letters, spaces, signs and pasted text are dropped.
+ */
+export function numericInput(text: string) {
+  const cleaned = text.replace(/[^\d.,]/g, "");
+  const sep = cleaned.search(/[.,]/);
+  if (sep === -1) return cleaned;
+  const whole = cleaned.slice(0, sep) || "0";
+  const fraction = cleaned.slice(sep + 1).replace(/[.,]/g, "").slice(0, 2);
+  return `${whole}${cleaned[sep]}${fraction}`;
+}
+
 /** Offer validity choices, in days from today; `null` means no expiry. */
 export const VALIDITY_CHOICES = [
   { value: "none", label: "Без срок", days: null },

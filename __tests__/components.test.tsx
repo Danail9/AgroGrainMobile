@@ -1,8 +1,9 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react-native";
-import { Alert, Text } from "react-native";
+import { Text } from "react-native";
 
 import { ApiClientError } from "@/api/client";
+import * as Dialog from "@/ui/Dialog";
 import { GATE_COPY, Gate } from "@/ui/Gate";
 import { ChangeBadge, Pill, SampleSpecs, UnreadBadge } from "@/ui/primitives";
 import { QueryBoundary } from "@/ui/QueryBoundary";
@@ -172,7 +173,7 @@ describe("DeleteAccountForm", () => {
 
     await fireEvent.press(screen.getByText("Изтрий профила"));
     expect(screen.getByText("Паролата ти")).toBeTruthy();
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+    const alert = jest.spyOn(Dialog, "showDialog").mockImplementation(() => undefined);
     await fireEvent.press(screen.getByText("Изтрий профила окончателно"));
     expect(alert).not.toHaveBeenCalled();
 

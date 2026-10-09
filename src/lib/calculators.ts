@@ -30,7 +30,72 @@ export function toNumber(raw: string | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+/**
+ * Profit for a crop from yield, sale price and costs per decare, plus the
+ * break-even price and yield. A zero divisor shows "—" instead of Infinity.
+ */
+export function computeProfit({
+  area,
+  yieldKg,
+  price,
+  cost,
+}: {
+  area: number;
+  yieldKg: number;
+  price: number;
+  cost: number;
+}) {
+  const tonnes = (area * yieldKg) / 1000;
+  const revenue = tonnes * price;
+  const expenses = area * cost;
+  const profit = revenue - expenses;
+  return {
+    tonnes,
+    revenue,
+    expenses,
+    profit,
+    profitPerDka: area ? profit / area : null,
+    breakEvenPrice: yieldKg ? (cost * 1000) / yieldKg : null,
+    breakEvenYield: price ? (cost * 1000) / price : null,
+  };
+}
+
+export const PROFIT_CALCULATOR_KEY = "profit";
+
 export const CALCULATORS: CalculatorDef[] = [
+  {
+    key: PROFIT_CALCULATOR_KEY,
+    emoji: "📈",
+    title: "Печалба от култура",
+    description: "Приход, печалба и цена на рентабилност по текущите цени.",
+    fields: [
+      { key: "area", label: "Площ", suffix: "дка", initial: 100 },
+      { key: "yieldKg", label: "Очакван добив", suffix: "кг/дка", initial: 550 },
+      { key: "price", label: "Продажна цена", suffix: "€/т", initial: 220 },
+      { key: "cost", label: "Разходи", suffix: "€/дка", initial: 85 },
+    ],
+    compute: ({ area, yieldKg, price, cost }) => {
+      const r = computeProfit({ area, yieldKg, price, cost });
+      return [
+        { label: "Общ добив", value: `${formatNumber(r.tonnes, 1)} т` },
+        { label: "Приход", value: `${formatNumber(r.revenue, 2)} €` },
+        { label: "Разходи", value: `${formatNumber(r.expenses, 2)} €` },
+        { label: r.profit < 0 ? "Загуба" : "Печалба", value: `${formatNumber(r.profit, 2)} €` },
+        {
+          label: "Печалба на декар",
+          value: r.profitPerDka === null ? "—" : `${formatNumber(r.profitPerDka, 2)} €/дка`,
+        },
+        {
+          label: "Цена на рентабилност",
+          value: r.breakEvenPrice === null ? "—" : `${formatNumber(r.breakEvenPrice, 2)} €/т`,
+        },
+        {
+          label: "Добив на рентабилност",
+          value: r.breakEvenYield === null ? "—" : `${formatNumber(r.breakEvenYield)} кг/дка`,
+        },
+      ];
+    },
+  },
   {
     key: "seeds",
     emoji: "🌱",

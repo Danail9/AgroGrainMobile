@@ -2,15 +2,26 @@ import { useState } from "react";
 import { View } from "react-native";
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 
-import { CHART_HEIGHT, buildChart } from "@/lib/chart";
+import { CHART_HEIGHT, buildChart, buildComparisonChart } from "@/lib/chart";
 import { formatNumber, formatShortDate } from "@/lib/format";
 import { colors, space } from "@/theme/tokens";
 import { AppText } from "@/ui/Text";
 
 type Point = { date: string; price: number };
 
-/** Sparkline of recorded daily prices, drawn in real pixels at the measured width. */
-export function PriceChart({ points, unit }: { points: Point[]; unit: string }) {
+/**
+ * Sparkline of recorded daily prices, drawn in real pixels at the measured width.
+ * With `compare`, last year's prices are drawn dashed on the same axes.
+ */
+export function PriceChart({
+  points,
+  unit,
+  compare,
+}: {
+  points: Point[];
+  unit: string;
+  compare?: Point[];
+}) {
   const [width, setWidth] = useState(0);
 
   if (points.length < 2) {
@@ -23,10 +34,12 @@ export function PriceChart({ points, unit }: { points: Point[]; unit: string }) 
 
   const first = points[0];
   const last = points[points.length - 1];
-  const chart = buildChart(
+  const comparison = compare ? buildComparisonChart(points, compare, width) : null;
+  const chart = comparison ?? buildChart(
     points.map((point) => point.price),
     width,
   );
+  const compareLine = comparison?.compareLine ?? null;
   const stroke = chart?.rising === false ? colors.down : colors.up;
 
   return (
@@ -57,6 +70,17 @@ export function PriceChart({ points, unit }: { points: Point[]; unit: string }) 
                 </LinearGradient>
               </Defs>
               <Path d={chart.area} fill="url(#priceFill)" />
+              {compareLine ? (
+                <Path
+                  d={compareLine}
+                  fill="none"
+                  stroke={colors.slate}
+                  strokeWidth={1.75}
+                  strokeDasharray="5 4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ) : null}
               <Path
                 d={chart.line}
                 fill="none"
@@ -94,6 +118,38 @@ export function PriceChart({ points, unit }: { points: Point[]; unit: string }) 
           {formatShortDate(new Date(last.date))}
         </AppText>
       </View>
+
+      {compare ? (
+        <View style={{ flexDirection: "row", gap: space.lg, marginTop: space.sm }}>
+          <Legend color={stroke} label="Тази година" />
+          {compareLine ? (
+            <Legend color={colors.slate} label="Миналата година" dashed />
+          ) : (
+            <AppText variant="caption" tone="muted">
+              Няма записани цени за същия период миналата година.
+            </AppText>
+          )}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function Legend({ color, label, dashed = false }: { color: string; label: string; dashed?: boolean }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      <View
+        style={{
+          width: 16,
+          height: 0,
+          borderTopWidth: 2,
+          borderColor: color,
+          borderStyle: dashed ? "dashed" : "solid",
+        }}
+      />
+      <AppText variant="caption" tone="muted">
+        {label}
+      </AppText>
     </View>
   );
 }

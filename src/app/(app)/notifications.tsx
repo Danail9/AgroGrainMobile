@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { Alert, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import {
   useClearNotifications,
@@ -10,6 +10,7 @@ import {
 import { relativeTime } from "@/lib/format";
 import { NOTIFICATION_ICONS, internalPath } from "@/lib/notifications";
 import { colors, space } from "@/theme/tokens";
+import { showDialog } from "@/ui/Dialog";
 import { Icon } from "@/ui/Icon";
 import { Card, Divider, IconTile, RowList, pressedStyle } from "@/ui/primitives";
 import { QueryBoundary } from "@/ui/QueryBoundary";
@@ -58,10 +59,17 @@ export default function NotificationsScreen() {
                   <Pressable
                     accessibilityRole="button"
                     onPress={() =>
-                      Alert.alert("Да изтрия ли всички известия?", "Това действие не може да бъде отменено.", [
-                        { text: "Отказ", style: "cancel" },
-                        { text: "Изтрий", style: "destructive", onPress: () => clear.mutate() },
-                      ])
+                      showDialog({
+                        title: "Да изтрия ли всички известия?",
+                        message: "Това действие не може да бъде отменено.",
+                        icon: "trash-outline",
+                        tone: "danger",
+                        dismissable: true,
+                        actions: [
+                          { label: "Отказ", style: "cancel" },
+                          { label: "Изтрий", style: "destructive", onPress: () => clear.mutate() },
+                        ],
+                      })
                     }
                     hitSlop={8}
                     style={{ paddingHorizontal: 8, paddingVertical: 6 }}
@@ -118,7 +126,12 @@ export default function NotificationsScreen() {
                         accessibilityLabel={`${unread ? "Непрочетено. " : ""}${item.title}`}
                         onPress={() => {
                           if (unread) markRead.mutate(item.id, {
-                            onError: (error) => Alert.alert("Известието не е отбелязано като прочетено", error.message),
+                            onError: (error) => showDialog({
+                              title: "Известието не е отбелязано като прочетено",
+                              message: error.message,
+                              tone: "danger",
+                              icon: "alert-circle-outline",
+                            }),
                           });
                           if (target) router.push(target);
                         }}

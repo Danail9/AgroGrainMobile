@@ -1,14 +1,19 @@
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
+
+import { useMarket, useMe } from "@/api/queries";
 
 import {
   CALCULATORS,
   initialValues,
+  PROFIT_CALCULATOR_KEY,
   runCalculator,
   sanitizeDecimal,
   type CalculatorDef,
 } from "@/lib/calculators";
-import { colors, space } from "@/theme/tokens";
+import { favoritesFirst } from "@/lib/favorites";
+import { formatNumber } from "@/lib/format";
+import { colors, radius, space } from "@/theme/tokens";
 import { TextField } from "@/ui/forms";
 import { Icon } from "@/ui/Icon";
 import { Card, Divider, RowList, pressedStyle } from "@/ui/primitives";
@@ -19,10 +24,12 @@ export default function CalculatorScreen() {
   const [active, setActive] = useState<CalculatorDef | null>(null);
   // Raw text, so a field can be empty while typing instead of snapping back to 0.
   const [values, setValues] = useState<Record<string, string>>({});
+  const [crop, setCrop] = useState<string | null>(null);
 
   function open(def: CalculatorDef) {
     setActive(def);
     setValues(initialValues(def));
+    setCrop(null);
   }
 
   return (
@@ -97,6 +104,16 @@ export default function CalculatorScreen() {
             ))}
           </Card>
 
+          {active.key === PROFIT_CALCULATOR_KEY ? (
+            <CropPricePicker
+              selected={crop}
+              onPick={(slug, price) => {
+                setCrop(slug);
+                setValues((prev) => ({ ...prev, price: String(Math.round(price * 100) / 100).replace(".", ",") }));
+              }}
+            />
+          ) : null}
+
           <RowList>
             {runCalculator(active, values).map((result, index) => (
               <View key={result.label}>
@@ -124,5 +141,58 @@ export default function CalculatorScreen() {
         </>
       )}
     </Screen>
+  );
+}
+
+/** Fills the sale price from today's market price of a crop, followed crops first. */
+function CropPricePicker({
+  selected,
+  onPick,
+}: {
+  selected: string | null;
+  onPick: (slug: string, price: number) => void;
+}) {
+  const market = useMarket();
+  const me = useMe();
+  const crops = favoritesFirst(
+    (market.data?.prices ?? []).filter((row) => row.unit === "€/т"),
+    me.data?.favoriteCrops,
+  );
+  if (!crops.length) return null;
+
+  return (
+    <View style={{ gap: space.sm }}>
+      <AppText variant="caption" tone="muted">
+        Попълни цената по днешната борсова цена:
+      </AppText>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
+        {crops.map((row) => {
+          const on = row.slug === selected;
+          return (
+            <Pressable
+              key={row.slug}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              onPress={() => onPick(row.slug, row.price)}
+              style={({ pressed }) => [
+                {
+                  paddingHorizontal: space.md,
+                  paddingVertical: 8,
+                  borderRadius: radius.pill,
+                  borderWidth: 1,
+                  borderColor: on ? colors.brand[600] : colors.line,
+                  backgroundColor: on ? colors.brand[50] : colors.white,
+                },
+                pressed && pressedStyle,
+              ]}
+            >
+              <AppText variant="caption" bold={on} tone={on ? "brand" : "ink"}>
+                {row.emoji} {row.name} · {formatNumber(row.price)} €/т
+              </AppText>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 }
