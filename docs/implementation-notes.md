@@ -19,6 +19,71 @@ The spec is the intent; this file is what exists.
 
 ## Verified, and how
 
+### Full-access subscriptions
+
+Each role has one plan: Стопанин for farmers and Търговец for traders, with
+monthly (€50) and annual (€500) billing. Both include Борса; annual billing
+saves €100. Prices and features come from the backend catalog, not app constants.
+Farmer purchases use BASE; trader purchases use TRADER. Legacy tiers remain
+readable and labels use the account role. Existing Stripe renewals keep their
+original prices until the customer changes plans. Deploy the backend and
+configure the new Stripe price IDs before releasing this app update.
+
+### Local iPhone testing with a free Apple account
+
+Use `IOS_PERSONAL_TEAM=1 npx expo prebuild --platform ios --no-clean --no-install`
+to remove Push Notifications, Associated Domains and Sign in with Apple
+entitlements from the generated iOS project. Select your Personal Team under
+Signing & Capabilities in Xcode and run on your connected iPhone. Remote push,
+universal links and Apple sign-in are unavailable in this local build; use email
+sign-in. Do not set this flag in EAS environments. Regenerate without the flag
+before a paid-team or store build to restore production capabilities.
+
+### Optional biometric app lock
+
+Notifications request fresh data on screen mount and app resume, retaining cached
+data during fetching and offline. While signed in, unlocked and foregrounded,
+notifications are checked every 10 seconds; checks pause offline/in the background
+and stop on lock/logout. The Home bell reads the same notification query. Automatic
+checks do not show the pull-to-refresh spinner. This is polling after server
+creation, not immediate remote push delivery. Home and weather keep their 15-minute freshness
+windows; notification refresh does not invalidate them.
+Home's pull-to-refresh indicator tracks only a user-initiated refresh, not
+background home/weather requests. It stops after that refresh settles, including
+failure; returning to Home does not activate the indicator.
+The signed-in app keeps the notifications query subscribed across all screens.
+Unread alerts use a filled amber bell and count badge. Profile > Notifications
+offers device-local, per-account "Банери в приложението" (off by default).
+After the initial baseline, new unread items show a dismissable six-second banner
+while foregrounded, provided both this option and the master notification switch
+are enabled. Tapping opens notifications; old items do not generate banner bursts.
+These foreground banners do not require APNs or substitute for lock-screen push.
+
+Profile settings offer Face ID / Touch ID on iOS and strong biometrics on Android.
+After successful email registration/login or completed social sign-in, eligible
+devices show an optional biometric setup prompt. "Not now" dismisses it for that
+sign-in; restored sessions and token renewal do not show it again. Already-enabled
+locks and unsupported devices skip the prompt. Enabling requires OS verification
+and successful preference storage; failures remain visible with retry/skip.
+Enabling and disabling require OS authentication. The device-local preference is
+stored in SecureStore and cleared on logout/session revocation. An enabled lock
+blocks private screens on cold launch and on leaving the foreground; authentication
+starts automatically on opening or returning to the app. Each foreground visit
+gets one automatic attempt; cancellation/errors leave an explicit Unlock retry
+instead of repeatedly prompting. Cancellation/errors never reveal private screens, and
+users can sign out instead if biometrics become unavailable. The OS device
+passcode is an allowed fallback. No password or biometric data is stored by the
+app, and this lock does not replace server authentication or renew expired sessions.
+Web and iOS Expo Go cannot enable it. Rebuild native apps after installing
+`expo-local-authentication`; iOS needs the plugin's Face ID usage description.
+
+The free Personal Team build explicitly disables remote push registration and
+explains the limitation in notification settings. Paid-team iOS builds need APNs
+credentials on EAS; Android builds need Firebase `google-services.json` plus an
+FCM v1 service-account credential on EAS. Existing backend push delivery and
+in-app notification preferences remain unchanged. Remote delivery must be tested
+on a configured build before release.
+
 - `tsc --noEmit` clean in both repos; `expo lint` clean; `expo-doctor` 21/21.
 - AgroMobile: 108 Jest tests (formatters, calculators, API client incl. single-flight
   refresh, gate copy, query states). AgroGrain: 94 Vitest tests.
@@ -161,6 +226,7 @@ Code is in place and covered by unit tests where the logic is pure; none of it h
 | EAS profiles | `eas.json` | `eas init` to create the project, then `eas build`. |
 | CI | `../.github/workflows/ci.yml` | Typecheck, lint, tests for both projects and a schema-copy drift check. Move it to the repo root if the repo is split. |
 | Engagement features | `src/app/(app)/market/[crop].tsx` (favourite star, 30/90/365-day range, last-year overlay via `buildComparisonChart`/`yearOverYear`, `PriceAlerts`), `SaveButton` + "Удължи с 7 дни" on trade details, "Запазени" tab on Борса, `BillingManagement` (renewal + invoices) on Абонамент, profit calculator in `src/lib/calculators.ts`, `src/ui/Dialog.tsx` replacing `Alert.alert` | Portal migration `20261009090000_engagement_features` and the cron workflow secrets. Builds older than this parse the notification type enum strictly, so new types may fail their notifications list until users update. |
+| Google / Apple sign-in | `src/ui/SocialButtons.tsx` (login, register), `src/lib/social-sign-in.ts`, `src/app/(auth)/complete-profile.tsx`, `AuthContext.socialSignIn` → `POST /api/v1/auth/social` | A new development or store build (both libraries are native). Google: OAuth client ids (Web, iOS, Android with the SHA-1 of each signing key) in Google Cloud, `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` / `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` in the app (the iOS URL scheme is added by `app.config.ts`), and `GOOGLE_CLIENT_IDS` on the portal. Apple: the "Sign in with Apple" capability on the App ID (iOS only). Portal migration `20261009110000_social_sign_in`. Each button hides itself when not available. |
 
 ## Known issues and decisions to make
 

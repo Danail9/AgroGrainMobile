@@ -10,7 +10,7 @@ import { keys, usePlans, useStartCheckout } from "@/api/queries";
 import { meSchema, type Me } from "@/api/schemas";
 import { STRIPE_PUBLISHABLE_KEY } from "@/config";
 import { formatShortDate } from "@/lib/format";
-import { TIER_LABELS } from "@/lib/plans";
+import { planTierLabel } from "@/lib/plans";
 import { colors, radius, space } from "@/theme/tokens";
 import { showDialog } from "@/ui/Dialog";
 import { Button, FormMessage } from "@/ui/forms";
@@ -114,7 +114,7 @@ export function PlanList({
         onChanged();
         showDialog({
           title: "Промяната е планирана",
-          message: `${TIER_LABELS[plan.tier]} започва на ${formatShortDate(new Date(session.scheduledChange.effectiveAt))}. Дотогава запазваш текущия си план. Няма плащане сега.`,
+          message: `${planTierLabel(plan.tier, role)} започва на ${formatShortDate(new Date(session.scheduledChange.effectiveAt))}. Дотогава запазваш текущия си план. Няма плащане сега.`,
           icon: "calendar",
           actions: [{ label: "Разбрах", style: "primary" }],
         });
@@ -141,7 +141,7 @@ export function PlanList({
       }
       paymentAccepted = true;
       // The Stripe webhook activates the plan a moment after the payment.
-      const wantsTrade = plan.tier === "TRADER";
+      const wantsTrade = plan.tradeFeatures.length > 0;
       let activated = false;
       for (let attempt = 0; attempt < 12 && !activated; attempt++) {
         // Ask the server to read the payment from Stripe instead of waiting for the webhook.
@@ -195,7 +195,7 @@ export function PlanList({
       {({ plans: list, current, scheduledChange }) => {
         const interval = billingInterval ?? current?.interval ?? "MONTH";
         const rolePlans = list.filter((plan) =>
-          role === "FARMER" || (role === "TRADER" && plan.tier === "TRADER"),
+          (role === "FARMER" && plan.tier === "BASE") || (role === "TRADER" && plan.tier === "TRADER"),
         );
         const visiblePlans = rolePlans.filter((plan) => plan.interval === interval);
 
@@ -218,7 +218,7 @@ export function PlanList({
                 <Pill tone="brand">{current.interval === "MONTH" ? "Месечен" : "Годишен"}</Pill>
               </View>
               <AppText variant="heading">
-                {TIER_LABELS[current.tier]}
+                {planTierLabel(current.tier, role)}
               </AppText>
               {current.currentPeriodEnd ? (
                 <AppText variant="small" bold>
@@ -240,12 +240,12 @@ export function PlanList({
             <Card style={{ gap: space.sm, backgroundColor: colors.brand[50] }}>
               <AppText variant="small" bold>Планирана промяна</AppText>
               <AppText variant="small">
-                {TIER_LABELS[scheduledChange.tier]} · {scheduledChange.interval === "YEAR" ? "годишен" : "месечен"}
+                {planTierLabel(scheduledChange.tier, role)} · {scheduledChange.interval === "YEAR" ? "годишен" : "месечен"}
               </AppText>
               <AppText variant="caption" tone="muted">
                 Започва на {formatShortDate(new Date(scheduledChange.effectiveAt))}. Дотогава запазваш текущия си план. Няма плащане сега.
               </AppText>
-              {current?.tier === "BASE" && !current.managedByAdmin &&
+              {role === "TRADER" && current?.tier === "BASE" && !current.managedByAdmin &&
                 scheduledChange.tier === "TRADER" &&
                 scheduledChange.interval === current.interval ? (
                   <Button
@@ -352,7 +352,7 @@ export function PlanList({
                     }}
                   >
                     <View style={{ flex: 1, gap: 2 }}>
-                      <AppText variant="heading">{TIER_LABELS[plan.tier]}</AppText>
+                      <AppText variant="heading">{planTierLabel(plan.tier, role)}</AppText>
                       <AppText variant="caption" tone="muted">
                         {plan.tier === "BASE"
                           ? "За стопани"

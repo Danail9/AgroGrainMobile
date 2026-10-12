@@ -3,7 +3,7 @@ import Constants, { ExecutionEnvironment } from "expo-constants";
 import { Platform } from "react-native";
 
 import { registerPushToken, removePushToken } from "@/api/queries";
-import { internalPath } from "@/lib/notifications";
+import { listenForNotificationResponses } from "@/lib/push-responses";
 
 const TOKEN_KEY = "agro.push-token";
 
@@ -18,7 +18,19 @@ function projectId(): string | null {
  * The module is imported lazily so Expo Go never loads it.
  */
 export function pushSupported() {
-  return Constants.executionEnvironment !== ExecutionEnvironment.StoreClient && projectId() !== null;
+  return pushUnavailableReason() === null;
+}
+
+export function pushUnavailableReason(): string | null {
+  if (Platform.OS === "web") return "Известията на телефона са достъпни в мобилното приложение.";
+  if (Platform.OS === "ios" && Constants.expoConfig?.extra?.iosPersonalTeam === true) {
+    return "Push известията на iPhone изискват платен Apple Developer акаунт. Известията в приложението остават достъпни.";
+  }
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+    return "За push известия е нужна инсталирана версия на приложението, не Expo Go.";
+  }
+  if (!projectId()) return "Push известията не са конфигурирани за тази версия на приложението.";
+  return null;
 }
 
 /** "granted", "denied" or "undetermined" for this device. */
@@ -69,7 +81,7 @@ export async function disablePush() {
  * Shows alerts that arrive while the app is open and opens the screen a tapped
  * alert points to. Returns a cleanup function.
  */
-export async function listenForPush(open: (path: string) => void) {
+export async function listenForPush(open: (path: string) => void, signal?: AbortSignal) {
   if (!pushSupported()) return () => undefined;
   const Notifications = await import("expo-notifications");
 
@@ -82,16 +94,5 @@ export async function listenForPush(open: (path: string) => void) {
     }),
   });
 
-  const handle = (response: { notification: { request: { content: { data?: unknown } } } }) => {
-    const url = (response.notification.request.content.data as { url?: unknown } | undefined)?.url;
-    const path = internalPath(typeof url === "string" ? url : null);
-    if (path) open(path);
-  };
-
-  const subscription = Notifications.addNotificationResponseReceivedListener(handle);
-  // The alert that launched the app from a closed state.
-  const initial = await Notifications.getLastNotificationResponseAsync();
-  if (initial) handle(initial);
-
-  return () => subscription.remove();
+  return listenForNotificationResponses(Notifications, open, signal);
 }

@@ -1,46 +1,19 @@
 import { Link } from "expo-router";
 import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { View } from "react-native";
 
 import { isApiError } from "@/api/client";
 import { useRegions } from "@/api/queries";
 import { useAuth } from "@/auth/AuthContext";
 import { DEFAULT_PHONE_CODE, PHONE_CODES } from "@/lib/phone";
-import { colors, radius, space } from "@/theme/tokens";
+import { space } from "@/theme/tokens";
+import { AccountTypePicker, accountType, type AccountRole } from "@/ui/AccountType";
 import { AuthLayout } from "@/ui/AuthLayout";
 import { Button, ChoiceGroup, FormMessage, TextField } from "@/ui/forms";
-import { Icon, type IconName } from "@/ui/Icon";
 import { LegalLinks } from "@/ui/LegalLinks";
+import { SocialButtons } from "@/ui/SocialButtons";
 import { RegionPicker, type RegionValue } from "@/ui/RegionPicker";
 import { AppText } from "@/ui/Text";
-
-type Role = "FARMER" | "TRADER";
-
-const ACCOUNT_TYPES: {
-  value: Role;
-  label: string;
-  hint: string;
-  icon: IconName;
-  nameLabel: string;
-  namePlaceholder: string;
-}[] = [
-  {
-    value: "FARMER",
-    label: "Фермер",
-    hint: "Продавам продукция",
-    icon: "leaf",
-    nameLabel: "Стопанство",
-    namePlaceholder: "ЗП Добруджа",
-  },
-  {
-    value: "TRADER",
-    label: "Търговец",
-    hint: "Купувам и публикувам цени",
-    icon: "swap-horizontal",
-    nameLabel: "Фирма",
-    namePlaceholder: "АгроТрейд ЕООД",
-  },
-];
 
 const FIELDS = ["name", "farmName", "phone", "email", "password", "confirm"] as const;
 type FieldName = (typeof FIELDS)[number];
@@ -49,7 +22,7 @@ export default function RegisterScreen() {
   const { register } = useAuth();
   const regions = useRegions();
 
-  const [role, setRole] = useState<Role>("FARMER");
+  const [role, setRole] = useState<AccountRole>("FARMER");
   const [name, setName] = useState("");
   const [farmName, setFarmName] = useState("");
   const [phoneCode, setPhoneCode] = useState(DEFAULT_PHONE_CODE);
@@ -63,7 +36,7 @@ export default function RegisterScreen() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
 
-  const account = ACCOUNT_TYPES.find((type) => type.value === role) ?? ACCOUNT_TYPES[0];
+  const account = accountType(role);
   const regionName =
     regions.data?.regions.find((item) => item.slug === region.regionSlug)?.name ?? "Добрич";
 
@@ -101,35 +74,9 @@ export default function RegisterScreen() {
       <View style={{ gap: space.md }}>
         <FormMessage error={error} />
 
-        <View style={{ gap: 6 }}>
-          <AppText variant="caption" tone="muted" bold>
-            Тип профил
-          </AppText>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            {ACCOUNT_TYPES.map((type) => {
-              const selected = type.value === role;
-              return (
-                <Pressable
-                  key={type.value}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  onPress={() => setRole(type.value)}
-                  style={[styles.typeCard, selected && styles.typeCardSelected]}
-                >
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Icon name={type.icon} size={16} color={colors.brand[700]} />
-                    <AppText variant="small" bold>
-                      {type.label}
-                    </AppText>
-                  </View>
-                  <AppText variant="caption" tone="muted">
-                    {type.hint}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+        <SocialButtons dividerLabel="или с имейл" dividerBelow />
+
+        <AccountTypePicker value={role} onChange={setRole} />
 
         <TextField
           label="Име и фамилия"
@@ -236,16 +183,3 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  typeCard: {
-    flex: 1,
-    gap: 2,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.white,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  typeCardSelected: { borderColor: colors.brand[600], backgroundColor: colors.brand[50] },
-});

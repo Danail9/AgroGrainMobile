@@ -133,6 +133,16 @@ export const authResultSchema = z.object({
   user: publicUserSchema,
 });
 
+/** `/auth/social`: a session, or a request to collect the profile first. */
+export const socialAuthResultSchema = z.union([
+  authResultSchema,
+  z.object({
+    needsProfile: z.literal(true),
+    email: z.string(),
+    name: z.string().nullable(),
+  }),
+]);
+
 export const refreshResultSchema = z.object({
   token: z.string(),
   expiresAt: isoDate,

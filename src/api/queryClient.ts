@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { QueryClient, onlineManager } from "@tanstack/react-query";
+import { AppState } from "react-native";
 
 import { isApiError } from "@/api/client";
 import { CACHE_MAX_AGE, keys } from "@/api/queries";
@@ -55,6 +56,31 @@ export function watchConnectivity() {
   return NetInfo.addEventListener((state) => {
     onlineManager.setOnline(state.isConnected !== false && state.isInternetReachable !== false);
   });
+}
+
+export const NOTIFICATION_REFRESH_INTERVAL = 10_000;
+
+/** Refresh only notifications while navigation is unlocked and foregrounded. */
+export function watchNotificationFreshness(client: QueryClient = queryClient) {
+  let previous = AppState.currentState;
+  const refresh = () => {
+    if (!onlineManager.isOnline()) return;
+    void client.invalidateQueries({ queryKey: keys.notifications }).catch((error) =>
+      console.error("Refreshing notifications failed", error),
+    );
+  };
+  const timer = setInterval(() => {
+    if (previous === "active") refresh();
+  }, NOTIFICATION_REFRESH_INTERVAL);
+  const subscription = AppState.addEventListener("change", (state) => {
+    const resumed = state === "active" && previous !== "active";
+    previous = state;
+    if (resumed) refresh();
+  });
+  return () => {
+    clearInterval(timer);
+    subscription.remove();
+  };
 }
 
 /** Wipes every cached answer, in memory and on disk. Called on sign-out. */

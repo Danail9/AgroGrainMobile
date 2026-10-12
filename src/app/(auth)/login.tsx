@@ -1,14 +1,15 @@
-import { Link } from "expo-router";
-import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Link, router } from "expo-router";
+import { useRef, useState } from "react";
+import { Pressable, StyleSheet, View, type TextInput } from "react-native";
 
 import { isApiError } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
-import { colors, space } from "@/theme/tokens";
+import { colors, radius, shadowCard, space } from "@/theme/tokens";
 import { AuthLayout } from "@/ui/AuthLayout";
 import { Button, FormMessage, TextField } from "@/ui/forms";
 import { Icon } from "@/ui/Icon";
 import { Card } from "@/ui/primitives";
+import { SocialButtons } from "@/ui/SocialButtons";
 import { AppText } from "@/ui/Text";
 
 export default function LoginScreen() {
@@ -19,6 +20,7 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [otherDevice, setOtherDevice] = useState<string | null>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   async function submit() {
     if (busy) return;
@@ -41,7 +43,7 @@ export default function LoginScreen() {
 
   return (
     <AuthLayout
-      title="Вход в AgroGrain"
+      title="Добре дошъл отново"
       subtitle="Влез, за да видиш времето, цените и AI анализите за твоя регион."
     >
       <View style={{ gap: space.lg }}>
@@ -49,7 +51,7 @@ export default function LoginScreen() {
           <Card style={{ gap: space.sm, borderColor: "#fde68a", backgroundColor: colors.amber50 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Icon name="phone-portrait-outline" size={20} color={colors.amber700} />
-              <AppText variant="heading" tone="warn">
+              <AppText variant="heading" tone="warn" style={{ flex: 1 }}>
                 Профилът е активен на друго устройство
               </AppText>
             </View>
@@ -63,74 +65,98 @@ export default function LoginScreen() {
           </Card>
         ) : null}
 
-        <FormMessage error={error} />
+        <View style={styles.card}>
+          <FormMessage error={error} />
 
-        <TextField
-          label="Имейл"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="ivan@ferma.bg"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-          textContentType="username"
-          returnKeyType="next"
-        />
-
-        <View style={{ gap: 6 }}>
           <TextField
-            label="Парола"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            secureTextEntry={!visible}
+            label="Имейл"
+            icon="mail-outline"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Въведи имейла си"
+            keyboardType="email-address"
             autoCapitalize="none"
-            autoComplete="current-password"
-            textContentType="password"
-            returnKeyType="go"
-            onSubmitEditing={submit}
-            suffix={undefined}
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="username"
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            submitBehavior="submit"
           />
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={visible ? "Скрий паролата" : "Покажи паролата"}
-              onPress={() => setVisible((v) => !v)}
-              hitSlop={8}
-            >
-              <AppText variant="caption" tone="muted" bold>
-                {visible ? "Скрий паролата" : "Покажи паролата"}
-              </AppText>
-            </Pressable>
+
+          <View style={{ gap: 10 }}>
+            <TextField
+              ref={passwordRef}
+              label="Парола"
+              icon="lock-closed-outline"
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Въведи паролата"
+              secureTextEntry={!visible}
+              autoCapitalize="none"
+              autoComplete="current-password"
+              textContentType="password"
+              returnKeyType="go"
+              onSubmitEditing={submit}
+              accessory={
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={visible ? "Скрий паролата" : "Покажи паролата"}
+                  onPress={() => setVisible((v) => !v)}
+                  hitSlop={8}
+                  style={{ paddingHorizontal: 14, paddingVertical: 12 }}
+                >
+                  <Icon name={visible ? "eye-off-outline" : "eye-outline"} size={20} color={colors.muted} />
+                </Pressable>
+              }
+            />
             <Link href="/forgot-password" asChild>
-              <Pressable accessibilityRole="link" hitSlop={8}>
-                <AppText variant="caption" tone="muted" bold>
+              <Pressable accessibilityRole="link" hitSlop={8} style={{ alignSelf: "flex-end" }}>
+                <AppText variant="caption" tone="brand" bold>
                   Забравена парола?
                 </AppText>
               </Pressable>
             </Link>
           </View>
+
+          <Button
+            title="Вход"
+            icon="log-in-outline"
+            onPress={submit}
+            loading={busy}
+            disabled={!email.trim() || !password}
+          />
+        </View>
+
+        <SocialButtons />
+
+        <View style={styles.divider}>
+          <View style={styles.rule} />
+          <AppText variant="caption" tone="muted">
+            Нямаш профил?
+          </AppText>
+          <View style={styles.rule} />
         </View>
 
         <Button
-          title="Вход"
-          onPress={submit}
-          loading={busy}
-          disabled={!email.trim() || !password}
+          title="Създай акаунт"
+          icon="person-add-outline"
+          variant="secondary"
+          onPress={() => router.push("/register")}
         />
-
-        <View style={{ alignItems: "center", paddingTop: space.sm }}>
-          <AppText variant="caption" tone="muted">
-            Нямаш профил?{" "}
-            <Link href="/register" asChild>
-              <AppText variant="caption" tone="brand" bold accessibilityRole="link">
-                Създай акаунт
-              </AppText>
-            </Link>
-          </AppText>
-        </View>
       </View>
     </AuthLayout>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    gap: space.lg,
+    padding: space.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.white,
+    ...shadowCard,
+  },
+  divider: { flexDirection: "row", alignItems: "center", gap: space.md },
+  rule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.line },
+});

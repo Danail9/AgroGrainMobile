@@ -12,6 +12,7 @@ import { UpdateBanner } from "@/ui/UpdateBanner";
 import { PushRegistrar } from "@/ui/PushRegistrar";
 import { Paywall } from "@/ui/Paywall";
 import { ErrorState, Loading } from "@/ui/QueryBoundary";
+import { InAppNotifications } from "@/ui/InAppNotifications";
 
 export const unstable_settings = { initialRouteName: "(tabs)" };
 
@@ -94,13 +95,13 @@ export default function AppLayout() {
   }
 
   return (
-    <>
+    <InAppNotifications key={user.id} userId={user.id} masterEnabled={me.data.notificationPrefs.enabled}>
       <UpdateBanner />
       <ActivityTracker />
       <PushRegistrar enabled={me.data.notificationPrefs.push} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
         <Stack.Screen name="(tabs)" />
       </Stack>
-    </>
+    </InAppNotifications>
   );
 }
