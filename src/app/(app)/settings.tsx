@@ -4,10 +4,13 @@ import { StyleSheet, View } from "react-native";
 
 import { useMe } from "@/api/queries";
 import { useAuth } from "@/auth/AuthContext";
+import { useBiometricLock } from "@/auth/BiometricContext";
 import { subscriptionLabel } from "@/lib/plans";
 import { ROLE_LABELS, initialsOf, notificationSummary } from "@/lib/settings";
 import { colors, radius, shadowCard, space } from "@/theme/tokens";
 import { showDialog } from "@/ui/Dialog";
+import { BiometricSettings } from "@/ui/BiometricLock";
+import { InAppNotificationSettings } from "@/ui/InAppNotifications";
 import { LegalLinks } from "@/ui/LegalLinks";
 import { Pill } from "@/ui/primitives";
 import { QueryBoundary } from "@/ui/QueryBoundary";
@@ -22,11 +25,12 @@ import {
 import { SettingsGroup, SettingsRow } from "@/ui/SettingsList";
 import { AppText } from "@/ui/Text";
 
-type Section = "profile" | "password" | "region" | "notifications" | "delete";
+type Section = "profile" | "password" | "region" | "notifications" | "delete" | "biometrics";
 
 export default function SettingsScreen() {
   const me = useMe();
   const { signOut } = useAuth();
+  const biometric = useBiometricLock();
   // One section open at a time keeps the page short and the open form in focus.
   const [open, setOpen] = useState<Section | null>(null);
   const toggle = (section: Section) => setOpen((current) => (current === section ? null : section));
@@ -76,7 +80,7 @@ export default function SettingsScreen() {
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
                     <Pill tone="brand">{ROLE_LABELS[user.role]}</Pill>
                     <Pill tone={subscription.active || subscription.freeAccess || subscription.exempt ? "sky" : "warn"}>
-                      {subscriptionLabel(subscription)}
+                      {subscriptionLabel(subscription, user.role)}
                     </Pill>
                   </View>
                 </View>
@@ -111,6 +115,15 @@ export default function SettingsScreen() {
                 >
                   <PasswordForm />
                 </SettingsRow>
+                <SettingsRow
+                  icon="finger-print-outline"
+                  title={biometric.capability?.label ?? "Биометрично отключване"}
+                  summary={biometric.enabled ? "Заключването е включено" : "Заключването е изключено"}
+                  open={open === "biometrics"}
+                  onPress={() => toggle("biometrics")}
+                >
+                  <BiometricSettings />
+                </SettingsRow>
               </SettingsGroup>
 
               <SettingsGroup title="Абонамент и известия">
@@ -118,7 +131,7 @@ export default function SettingsScreen() {
                   first
                   icon="card-outline"
                   title="Планове и плащане"
-                  summary={subscriptionLabel(subscription)}
+                  summary={subscriptionLabel(subscription, user.role)}
                   onPress={() => router.push("/subscription")}
                 />
                 <SettingsRow
@@ -128,6 +141,7 @@ export default function SettingsScreen() {
                   open={open === "notifications"}
                   onPress={() => toggle("notifications")}
                 >
+                  <InAppNotificationSettings />
                   <NotificationPrefsForm prefs={notificationPrefs} role={user.role} />
                 </SettingsRow>
               </SettingsGroup>

@@ -55,13 +55,13 @@ const mockPlans = plansSchema.parse({
   plans: [
     { tier: "BASE", interval: "MONTH", priceCents: 5000, name: "Стопанин · месечен", suffix: "/мес." },
     { tier: "BASE", interval: "YEAR", priceCents: 50000, name: "Стопанин · годишен", suffix: "/год." },
-    { tier: "TRADER", interval: "MONTH", priceCents: 10000, name: "Стопанин + Борса · месечен", suffix: "/мес." },
-    { tier: "TRADER", interval: "YEAR", priceCents: 100000, name: "Стопанин + Борса · годишен", suffix: "/год." },
+    { tier: "TRADER", interval: "MONTH", priceCents: 5000, name: "Търговец · месечен", suffix: "/мес." },
+    { tier: "TRADER", interval: "YEAR", priceCents: 50000, name: "Търговец · годишен", suffix: "/год." },
   ].map((plan) => ({
     ...plan,
-    savingCents: null,
+    savingCents: plan.interval === "YEAR" ? 10000 : null,
     features: ["Прогноза за времето"],
-    tradeFeatures: plan.tier === "TRADER" ? ["Достъп до Борса"] : [],
+    tradeFeatures: ["Достъп до Борса"],
   })),
 });
 
@@ -114,7 +114,7 @@ describe("role-specific subscription plans", () => {
     jest.mocked(api).mockResolvedValue({
       subscription: { active: true, tier: "TRADER", interval: "MONTH", canTrade: true },
     });
-    await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
+    await render(<PlanList role="TRADER" onChanged={jest.fn()} />);
     await fireEvent.press(screen.getByText("Надгради сега"));
     const confirm = alert.mock.calls[0]?.[0].actions?.find((button) => button.label === "Надгради и плати");
     await act(async () => { confirm?.onPress?.(); });
@@ -139,7 +139,7 @@ describe("role-specific subscription plans", () => {
     });
     mockInitSheet.mockResolvedValue({});
     mockPresentSheet.mockResolvedValue({ error: { code: "Canceled" } });
-    await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
+    await render(<PlanList role="TRADER" onChanged={jest.fn()} />);
     await fireEvent.press(screen.getByText("Надгради сега"));
     const confirm = alert.mock.calls[0]?.[0].actions?.find((button) => button.label === "Надгради и плати");
     await act(async () => { confirm?.onPress?.(); });
@@ -157,7 +157,7 @@ describe("role-specific subscription plans", () => {
     jest.mocked(api)
       .mockResolvedValueOnce({ synced: true })
       .mockResolvedValueOnce({
-        subscription: { active: true, tier: "BASE", interval: "MONTH", canTrade: false },
+        subscription: { active: true, tier: "BASE", interval: "MONTH", canTrade: true },
       });
     const onChanged = jest.fn();
     try {
@@ -173,9 +173,9 @@ describe("role-specific subscription plans", () => {
       expect(onChanged).toHaveBeenCalled();
       expect(router.replace).not.toHaveBeenCalled();
       const success = alert.mock.calls.find(([dialog]) => dialog.title === "Успешно плащане");
-      expect(success?.[0].actions?.[0].label).toBe("Към началото");
+      expect(success?.[0].actions?.[0].label).toBe("Към Борса");
       await act(async () => { success?.[0].actions?.[0].onPress?.(); });
-      expect(router.replace).toHaveBeenCalledWith("/");
+      expect(router.replace).toHaveBeenCalledWith("/trade");
     } finally {
       mockPlans.current = previous;
     }
@@ -186,7 +186,7 @@ describe("role-specific subscription plans", () => {
     const alert = jest.mocked(showDialog);
     mockCheckout.mockResolvedValue({ immediateUpgrade: true, paymentIntentClientSecret: null });
     jest.mocked(api).mockRejectedValue(new Error("Sync unavailable"));
-    await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
+    await render(<PlanList role="TRADER" onChanged={jest.fn()} />);
     await fireEvent.press(screen.getByText("Надгради сега"));
     const confirm = alert.mock.calls[0]?.[0].actions?.find((button) => button.label === "Надгради и плати");
     await act(async () => { confirm?.onPress?.(); });
@@ -203,7 +203,7 @@ describe("role-specific subscription plans", () => {
       subscription: { active: true, tier: "TRADER", interval: "MONTH", canTrade: true },
     });
     const onChanged = jest.fn();
-    await render(<PlanList role="FARMER" onChanged={onChanged} />);
+    await render(<PlanList role="TRADER" onChanged={onChanged} />);
     await fireEvent.press(screen.getByText("Надгради сега"));
     expect(mockCheckout).not.toHaveBeenCalled();
     const confirm = alert.mock.calls[0]?.[0].actions?.find((button) => button.label === "Надгради и плати",
@@ -232,7 +232,7 @@ describe("role-specific subscription plans", () => {
       paymentIntentClientSecret: null,
       scheduledChange: { tier: "TRADER", interval: "MONTH", effectiveAt: "2027-10-06T08:00:00.000Z" },
     });
-    await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
+    await render(<PlanList role="TRADER" onChanged={jest.fn()} />);
     await fireEvent.press(screen.getByText("Надгради сега"));
     const confirm = alert.mock.calls[0]?.[0].actions?.find((button) => button.label === "Надгради и плати",
     );
@@ -240,7 +240,7 @@ describe("role-specific subscription plans", () => {
     expect(await screen.findByText(/Сървърът не потвърди незабавно надграждане/)).toBeTruthy();
     expect(router.replace).not.toHaveBeenCalled();
   });
-  it("allows a scheduled yearly farmer upgrade to be activated now", async () => {
+  it("allows a legacy scheduled yearly trader upgrade to be activated now", async () => {
     if (mockPlans.current) {
       mockPlans.current.tier = "BASE";
       mockPlans.current.interval = "YEAR";
@@ -249,7 +249,7 @@ describe("role-specific subscription plans", () => {
       tier: "TRADER", interval: "YEAR", effectiveAt: "2027-10-06T08:00:00.000Z",
     };
     const alert = jest.mocked(showDialog);
-    await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
+    await render(<PlanList role="TRADER" onChanged={jest.fn()} />);
     await fireEvent.press(screen.getByText("Месечно"));
     await fireEvent.press(screen.getByText("Виж опцията за надграждане сега"));
     expect(screen.getByRole("tab", { name: "Годишно", selected: true })).toBeTruthy();
@@ -262,14 +262,14 @@ describe("role-specific subscription plans", () => {
   it("offers an immediate same-period upgrade but schedules annual changes", async () => {
     if (mockPlans.current) mockPlans.current.tier = "BASE";
     const alert = jest.mocked(showDialog);
-    await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
+    await render(<PlanList role="TRADER" onChanged={jest.fn()} />);
     await fireEvent.press(screen.getByText("Надгради сега"));
     expect(alert).toHaveBeenCalledWith(expect.objectContaining({
       title: "Надграждане сега", message: expect.stringContaining("оставащия платен период"),
     }));
     await fireEvent.press(screen.getByText("Годишно"));
     expect(screen.queryByText("Надгради сега")).toBeNull();
-    expect(screen.getAllByText("Промени при подновяване")).toHaveLength(2);
+    expect(screen.getAllByText("Промени при подновяване")).toHaveLength(1);
   });
 
   it("blocks older backends before sending a checkout that could charge immediately", async () => {
@@ -286,8 +286,9 @@ describe("role-specific subscription plans", () => {
   });
 
   it("shows a scheduled annual change while keeping the current monthly plan", async () => {
+    if (mockPlans.current) mockPlans.current.tier = "BASE";
     mockPlans.scheduledChange = {
-      interval: "YEAR", tier: "TRADER", effectiveAt: "2026-11-06T08:00:00.000Z",
+      interval: "YEAR", tier: "BASE", effectiveAt: "2026-11-06T08:00:00.000Z",
     };
     await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
     expect(screen.getByText("Планирана промяна")).toBeTruthy();
@@ -299,17 +300,17 @@ describe("role-specific subscription plans", () => {
     })).toBeTruthy();
   });
 
-  it("shows both farmer products for monthly and annual billing without trader role labels", async () => {
+  it("shows one full-access farmer plan for monthly and annual billing", async () => {
     await render(<PlanList role="FARMER" onChanged={jest.fn()} />);
 
-    expect(screen.getAllByText("Стопанин + Борса")).toHaveLength(2);
+    expect(screen.queryByText("Стопанин + Борса")).toBeNull();
     expect(screen.queryByText("Търговец")).toBeNull();
-    expect(screen.getByText("Стопанин")).toBeTruthy();
+    expect(screen.getAllByText("Стопанин")).toHaveLength(2);
     expect(screen.getByText(/^50 €/)).toBeTruthy();
-    expect(screen.getByText(/^100 €/)).toBeTruthy();
+    expect(screen.queryByText(/^100 €/)).toBeNull();
     expect(screen.getByText("Достъп до Борса")).toBeTruthy();
     expect(screen.queryByText("За търговци")).toBeNull();
-    expect(screen.getByText("За стопани с достъп до Борса")).toBeTruthy();
+    expect(screen.getByText("За стопани")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Месечно", selected: true })).toBeTruthy();
     expect(screen.getByText("Плащаш за един месец при всяко подновяване.")).toBeTruthy();
 
@@ -317,15 +318,16 @@ describe("role-specific subscription plans", () => {
     expect(screen.getByRole("tab", { name: "Годишно", selected: true })).toBeTruthy();
     expect(screen.getByText("Плащаш за цялата година наведнъж.")).toBeTruthy();
     expect(screen.getByText(/^500 €/)).toBeTruthy();
-    expect(screen.getByText(/^1000 €/)).toBeTruthy();
-    expect(screen.getAllByText("Стопанин + Борса")).toHaveLength(2);
+    expect(screen.queryByText(/^1000 €/)).toBeNull();
+    expect(screen.getByText("Спестяваш 100 € спрямо месечно плащане")).toBeTruthy();
     expect(screen.queryByText("Текущият ти план")).toBeNull();
   });
 
   it("keeps trader plans available to trader accounts", async () => {
     await render(<PlanList role="TRADER" onChanged={jest.fn()} />);
-    expect(screen.getByText(/^100 €/)).toBeTruthy();
+    expect(screen.getByText(/^50 €/)).toBeTruthy();
+    expect(screen.getAllByText("Търговец")).toHaveLength(2);
     expect(screen.getByText("Достъп до Борса")).toBeTruthy();
-    expect(screen.queryByText(/^50 €/)).toBeNull();
+    expect(screen.queryByText(/^100 €/)).toBeNull();
   });
 });

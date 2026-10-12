@@ -24,7 +24,8 @@ function HeaderButton({
       hitSlop={8}
       style={{ padding: 6 }}
     >
-      <Icon name={icon} size={24} color={colors.brand[700]} />
+      <Icon name={badge > 0 ? "notifications" : icon} size={24}
+        color={badge > 0 ? colors.amber700 : colors.brand[700]} />
       {badge > 0 ? (
         <View style={{ position: "absolute", top: 0, right: 0 }}>
           <UnreadBadge count={badge} />

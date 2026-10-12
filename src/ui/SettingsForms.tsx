@@ -14,7 +14,7 @@ import type { Me } from "@/api/schemas";
 import { useAuth } from "@/auth/AuthContext";
 import { normalizeDecimal } from "@/lib/forms";
 import { PHONE_CODES, PHONE_COUNTRIES, phoneInput, splitPhone } from "@/lib/phone";
-import { disablePush, enablePush, pushSupported } from "@/lib/push";
+import { disablePush, enablePush, pushSupported, pushUnavailableReason } from "@/lib/push";
 import { colors, radius, space } from "@/theme/tokens";
 import { showDialog } from "@/ui/Dialog";
 import { Button, FormMessage, TextField } from "@/ui/forms";
@@ -104,7 +104,7 @@ export function ProfileForm({ user, onSaved }: { user: Me["user"]; onSaved?: () 
 }
 
 /** Phone number with its dial code as a tappable prefix instead of a row of chips. */
-function PhoneField({
+export function PhoneField({
   code,
   onCode,
   value,
@@ -500,7 +500,11 @@ export function NotificationPrefsForm({ prefs, role }: {
           />
           <Divider />
         </>
-      ) : null}
+      ) : (
+        <AppText variant="caption" tone="muted" style={{ marginVertical: space.md }}>
+          {pushUnavailableReason()}
+        </AppText>
+      )}
       <AppText variant="small" bold>Пазарни цени</AppText>
       <Toggle
         label="Промяна в цените"

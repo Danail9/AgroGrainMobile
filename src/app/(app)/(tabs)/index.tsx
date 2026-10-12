@@ -1,8 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
+import { useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
-import { keys, useHome, useMarket, useMe, useTrade, useWeather } from "@/api/queries";
+import { keys, useHome, useMarket, useMe, useNotifications, useTrade, useWeather } from "@/api/queries";
 import type { Home, WeatherResponse } from "@/api/schemas";
 import { formatLongDate, formatNumber, greeting, relativeTime, updatedAgo } from "@/lib/format";
 import { expiringSoon, expiryOf, findMarketRow, formatPrice, marketDelta, topMovers } from "@/lib/trade";
@@ -39,10 +40,34 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const me = useMe();
   const home = useHome();
+  const notifications = useNotifications();
   const weather = useWeather(home.data?.role === "FARMER");
   const firstName = me.data?.user.name.split(" ")[0] ?? "";
-  const unread = home.data && "unreadCount" in home.data ? home.data.unreadCount : 0;
+  const unread = notifications.data?.unreadCount ??
+    (home.data && "unreadCount" in home.data ? home.data.unreadCount : 0);
   const trader = me.data?.user.role === "TRADER";
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshInProgress = useRef(false);
+
+  async function refreshHome() {
+    if (refreshInProgress.current) return;
+    refreshInProgress.current = true;
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        home.refetch(),
+        me.refetch(),
+        notifications.refetch(),
+        ...(home.data?.role === "FARMER" ? [weather.refetch()] : []),
+        ...(trader ? [queryClient.invalidateQueries({ queryKey: keys.trade })] : []),
+      ]);
+    } catch (error) {
+      console.error("Manual Home refresh failed", error);
+    } finally {
+      refreshInProgress.current = false;
+      setRefreshing(false);
+    }
+  }
 
   const salutation = `${greeting().replace("!", "")}${firstName ? `, ${firstName}` : ""}!`;
 
@@ -53,13 +78,8 @@ export default function HomeScreen() {
       wrapTitle
       subtitle={trader && home.dataUpdatedAt ? `${formatLongDate()} · ${updatedAgo(home.dataUpdatedAt).replace("обновено ", "обн. ").replace(/минути?/, "мин")}` : formatLongDate()}
       right={<HeaderActions unreadCount={unread} news={!trader} />}
-      onRefresh={() => {
-        void home.refetch();
-        void me.refetch();
-        if (home.data?.role === "FARMER") void weather.refetch();
-        if (trader) void queryClient.invalidateQueries({ queryKey: keys.trade });
-      }}
-      refreshing={home.isRefetching || weather.isRefetching}
+      onRefresh={() => void refreshHome()}
+      refreshing={refreshing}
     >
       <QueryBoundary query={home} stamp={!trader}>
         {(data) =>

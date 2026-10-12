@@ -204,7 +204,7 @@ export const useNotifications = () =>
   useQuery({
     queryKey: keys.notifications,
     queryFn: ({ signal }) => api("/notifications", { schema: notificationsSchema, signal }),
-    staleTime: 2 * MINUTE,
+    staleTime: 0,
   });
 
 export const useRegions = () =>

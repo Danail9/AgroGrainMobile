@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, space } from "@/theme/tokens";
+import { colors, shadowCard, space } from "@/theme/tokens";
 import { AppText } from "@/ui/Text";
 
 export function Logo({ size = 56 }: { size?: number }) {
@@ -48,14 +48,19 @@ export function AuthLayout({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ gap: space.md }}>
-          <Logo />
-          <View style={{ gap: 4 }}>
-            <AppText variant="title" accessibilityRole="header">
+        <View style={styles.hero}>
+          <View style={styles.logoTile}>
+            <Logo size={52} />
+          </View>
+          <AppText variant="caption" bold style={styles.wordmark}>
+            AGROGRAIN
+          </AppText>
+          <View style={{ gap: 6, alignItems: "center" }}>
+            <AppText variant="title" align="center" accessibilityRole="header">
               {title}
             </AppText>
             {subtitle ? (
-              <AppText variant="small" tone="muted">
+              <AppText variant="small" tone="muted" align="center" style={{ maxWidth: 320 }}>
                 {subtitle}
               </AppText>
             ) : null}
@@ -69,5 +74,16 @@ export function AuthLayout({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvas },
-  content: { paddingHorizontal: space.xl, gap: space.xl },
+  content: { flexGrow: 1, paddingHorizontal: space.xl, gap: space.xl },
+  hero: { alignItems: "center", gap: space.sm, paddingTop: space.lg },
+  logoTile: {
+    width: 84,
+    height: 84,
+    borderRadius: 26,
+    backgroundColor: colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+    ...shadowCard,
+  },
+  wordmark: { color: colors.brand[700], letterSpacing: 2, marginTop: 4 },
 });

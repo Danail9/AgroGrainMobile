@@ -18,7 +18,8 @@
       },
       "associatedDomains": [
         "applinks:www.agrograinhub.bg"
-      ]
+      ],
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "bg.agrograin.mobile",
@@ -55,6 +56,12 @@
       "./plugins/withIosScene",
       "expo-secure-store",
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "AgroGrain използва Face ID, за да отключиш приложението сигурно."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#ffffff",
@@ -76,7 +83,8 @@
         {
           "enableGooglePay": false
         }
-      ]
+      ],
+      "expo-apple-authentication"
     ],
     "extra": {
       "router": {},

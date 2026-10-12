@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import { Pressable, View } from "react-native";
 
 import {
@@ -19,6 +20,7 @@ import { AppText } from "@/ui/Text";
 
 export default function NotificationsScreen() {
   const query = useNotifications();
+  const [refreshing, setRefreshing] = useState(false);
   const markRead = useMarkRead();
   const markAll = useMarkAllRead();
   const clear = useClearNotifications();
@@ -28,8 +30,11 @@ export default function NotificationsScreen() {
       back="/"
       title="Известия"
       subtitle="Аларми за цени и време във твоя регион"
-      onRefresh={() => void query.refetch()}
-      refreshing={query.isRefetching}
+      onRefresh={() => {
+        setRefreshing(true);
+        void query.refetch().finally(() => setRefreshing(false));
+      }}
+      refreshing={refreshing}
     >
       <QueryBoundary query={query}>
         {({ items, unreadCount }) => (

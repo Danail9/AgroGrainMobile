@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, type Ref } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -74,9 +74,14 @@ export function TextField({
   suffix,
   hint,
   accessory,
+  icon,
+  ref,
   ...input
 }: TextInputProps & {
+  ref?: Ref<TextInput>;
   label: string;
+  /** Leading icon inside the input. */
+  icon?: IconName;
   error?: string | null;
   suffix?: string;
   hint?: string;
@@ -97,7 +102,13 @@ export function TextField({
           !!error && { borderColor: colors.down },
         ]}
       >
+        {icon ? (
+          <View style={{ paddingLeft: 14 }}>
+            <Icon name={icon} size={18} color={focused ? colors.brand[600] : colors.muted} />
+          </View>
+        ) : null}
         <TextInput
+          ref={ref}
           accessibilityLabel={label}
           placeholderTextColor={colors.muted}
           {...input}

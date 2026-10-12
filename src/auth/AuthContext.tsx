@@ -12,8 +12,10 @@ import {
 
 import { api, configureApi, type Session } from "@/api/client";
 import { clearCache } from "@/api/queryClient";
-import { authResultSchema } from "@/api/schemas";
+import { authResultSchema, socialAuthResultSchema } from "@/api/schemas";
+import type { SocialCredential } from "@/lib/social-sign-in";
 import { disablePush } from "@/lib/push";
+import { writeBiometricLock } from "@/lib/biometrics";
 import { z } from "zod";
 
 const SESSION_KEY = "ag.session";
@@ -48,6 +50,14 @@ async function writeStoredSession(session: Session | null) {
   }
 }
 
+async function clearStoredBiometricLock() {
+  try {
+    await writeBiometricLock(false);
+  } catch (e) {
+    console.error("Clearing biometric lock after session ended failed", e);
+  }
+}
+
 export type RegisterInput = {
   name: string;
   email: string;
@@ -61,21 +71,45 @@ export type RegisterInput = {
   settlement: string;
 };
 
+/** What a Google/Apple sign-in still needs before the account can be created. */
+export type SocialProfileInput = {
+  name: string;
+  farmName: string;
+  phoneCode: string;
+  phone: string;
+  role: "FARMER" | "TRADER";
+  regionSlug: string;
+  settlement: string;
+};
+
+export type SocialOutcome =
+  | { status: "signedIn" }
+  | { status: "needsProfile"; email: string; name: string | null };
+
 type Status = "loading" | "signedOut" | "signedIn";
 
 type AuthContextValue = {
   status: Status;
+  offerBiometrics: boolean;
+  dismissBiometricOffer: () => void;
   signIn: (email: string, password: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   signOut: () => Promise<void>;
   /** Adopts a session issued by the server (after a password change). */
   adoptSession: (session: Session) => Promise<void>;
+  /** Signs in with a Google/Apple token; a new person must finish the profile. */
+  socialSignIn: (credential: SocialCredential) => Promise<SocialOutcome>;
+  /** Creates the account for the pending Google/Apple sign-in. */
+  completeSocialProfile: (profile: SocialProfileInput) => Promise<void>;
+  hasPendingSocial: () => boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
+  const [offerBiometrics, setOfferBiometrics] = useState(false);
+  const dismissBiometricOffer = useCallback(() => setOfferBiometrics(false), []);
   // A ref, so the API client always reads the live token without re-rendering.
   const sessionRef = useRef<Session | null>(null);
 
@@ -86,7 +120,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const endSession = useCallback(async () => {
     await setSession(null);
+    await clearStoredBiometricLock();
     await clearCache();
+    setOfferBiometrics(false);
     setStatus("signedOut");
   }, [setSession]);
 
@@ -109,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         // An expired or corrupt entry must not linger in the keychain.
         await writeStoredSession(null);
+        await clearStoredBiometricLock();
         setStatus("signedOut");
       }
     });
@@ -128,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       await clearCache();
       await setSession({ token: result.token, expiresAt: result.expiresAt });
+      setOfferBiometrics(true);
       setStatus("signedIn");
     },
     [setSession],
@@ -143,10 +181,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       await clearCache();
       await setSession({ token: result.token, expiresAt: result.expiresAt });
+      setOfferBiometrics(true);
       setStatus("signedIn");
     },
     [setSession],
   );
+
+  // Kept in memory only: an identity token must never be written to storage.
+  const pendingSocial = useRef<SocialCredential | null>(null);
+
+  const postSocial = useCallback(
+    async (body: Record<string, unknown>): Promise<SocialOutcome> => {
+      const result = await api("/auth/social", {
+        method: "POST",
+        body,
+        schema: socialAuthResultSchema,
+        auth: false,
+      });
+      if ("needsProfile" in result) {
+        return { status: "needsProfile", email: result.email, name: result.name };
+      }
+      pendingSocial.current = null;
+      await clearCache();
+      await setSession({ token: result.token, expiresAt: result.expiresAt });
+      setOfferBiometrics(true);
+      setStatus("signedIn");
+      return { status: "signedIn" };
+    },
+    [setSession],
+  );
+
+  const socialSignIn = useCallback(
+    async (credential: SocialCredential) => {
+      pendingSocial.current = credential;
+      return postSocial({ ...credential });
+    },
+    [postSocial],
+  );
+
+  const completeSocialProfile = useCallback(
+    async (profile: SocialProfileInput) => {
+      const credential = pendingSocial.current;
+      if (!credential) throw new Error("no pending social sign-in");
+      const outcome = await postSocial({ ...credential, ...profile });
+      if (outcome.status !== "signedIn") throw new Error("profile was not accepted");
+    },
+    [postSocial],
+  );
+
+  const hasPendingSocial = useCallback(() => pendingSocial.current !== null, []);
 
   const signOut = useCallback(async () => {
     const token = sessionRef.current?.token;
@@ -175,8 +258,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ status, signIn, register, signOut, adoptSession }),
-    [status, signIn, register, signOut, adoptSession],
+    () => ({
+      status,
+      offerBiometrics,
+      dismissBiometricOffer,
+      signIn,
+      register,
+      signOut,
+      adoptSession,
+      socialSignIn,
+      completeSocialProfile,
+      hasPendingSocial,
+    }),
+    [status, offerBiometrics, dismissBiometricOffer, signIn, register, signOut, adoptSession, socialSignIn, completeSocialProfile, hasPendingSocial],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
