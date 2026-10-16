@@ -47,6 +47,11 @@ export function formatShortDate(date: Date) {
   return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}`;
 }
 
+/** "04.10.2025" */
+export function formatFullDate(date: Date) {
+  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()}`;
+}
+
 /** "пн" */
 export function formatWeekday(date: Date) {
   return WEEKDAYS_SHORT[date.getDay()];
@@ -56,6 +61,11 @@ export function formatWeekday(date: Date) {
 export function weekdayPhrase(date: Date) {
   const weekday = WEEKDAYS_LONG[date.getDay()];
   return weekday === "вторник" ? `във ${weekday}` : `в ${weekday}`;
+}
+
+export function formatEuro(cents: number) {
+  const value = cents / 100;
+  return `${Number.isInteger(value) ? value : value.toFixed(2).replace(".", ",")} €`;
 }
 
 /** "08:30" */

@@ -20,8 +20,10 @@ export function subscriptionLabel(subscription: {
   freeAccess: boolean;
   interval: Interval | null;
   tier: Tier | null;
+  trialActive?: boolean;
 }, role?: string) {
   if (subscription.exempt) return "Администраторски достъп";
+  if (subscription.trialActive) return "Безплатен пробен месец";
   if (subscription.freeAccess) return "Свободен достъп";
   if (subscription.interval && subscription.tier) {
     return planName(subscription.interval, subscription.tier, role);

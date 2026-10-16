@@ -26,6 +26,7 @@ import { QueryBoundary } from "@/ui/QueryBoundary";
 import { Screen } from "@/ui/Screen";
 import { AppText } from "@/ui/Text";
 import { WeatherGlyph } from "@/ui/WeatherGlyph";
+import { reportError } from "@/lib/monitoring";
 
 type FarmerHome = Extract<Home, { role: "FARMER" }>;
 type TraderHome = Extract<Home, { role: "TRADER" }>;
@@ -62,7 +63,7 @@ export default function HomeScreen() {
         ...(trader ? [queryClient.invalidateQueries({ queryKey: keys.trade })] : []),
       ]);
     } catch (error) {
-      console.error("Manual Home refresh failed", error);
+      reportError("Manual Home refresh failed", error);
     } finally {
       refreshInProgress.current = false;
       setRefreshing(false);

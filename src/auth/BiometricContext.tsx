@@ -9,6 +9,7 @@ import {
   authenticateBiometricLock, biometricCapability, biometricFailure,
   readBiometricLock, writeBiometricLock, type BiometricCapability,
 } from "@/lib/biometrics";
+import { reportError } from "@/lib/monitoring";
 
 type BiometricContextValue = {
   enabled: boolean;
@@ -60,7 +61,7 @@ export function BiometricProvider({ children }: { children: ReactNode }) {
       if (id === loadEpoch.current && statusRef.current === "signedIn") setCapability(available);
     } catch (e) {
       if (id !== loadEpoch.current || statusRef.current !== "signedIn") return;
-      console.error("Biometric lock initialization failed", e);
+      reportError("Biometric lock initialization failed", e);
       setError("Не успяхме да проверим настройките за отключване. Опитай отново.");
     }
   }, []);
@@ -131,7 +132,7 @@ export function BiometricProvider({ children }: { children: ReactNode }) {
       setLocked(enabledRef.current && id !== epoch.current);
     } catch (e) {
       if (statusRef.current === "signedIn") {
-        console.error("Biometric lock operation failed", e);
+        reportError("Biometric lock operation failed", e);
         setError("Неуспешна проверка или запис. Опитай отново.");
       }
     } finally {

@@ -99,6 +99,11 @@ export default function CompleteProfileScreen() {
         <FormMessage error={error} />
 
         <AccountTypePicker value={role} onChange={setRole} />
+        {role === "TRADER" ? (
+          <AppText variant="caption" tone="brand">
+            1 месец безплатен пълен достъп след регистрация, без карта и без автоматично таксуване. След това е нужен платен план.
+          </AppText>
+        ) : null}
 
         <TextField
           label="Име и фамилия"

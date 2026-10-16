@@ -19,6 +19,112 @@ The spec is the intent; this file is what exists.
 
 ## Verified, and how
 
+### Sentry account identification
+
+Authenticated reports use the readable account number (for example `"58"`) as
+Sentry's `user.id` and searchable `user_id`, with `user_number`
+and `role` tags, plus an `account` context with the admin profile path
+(`/admin/users/<number>`). The number is supplied by the backend's public user
+payload; it is optional for compatibility with older deployments. Identification
+is set immediately after login/registration/social login and refreshed by `/me`.
+The database ID remains in `internal_user_id` and `account.id`. If an older
+backend does not supply a number, Sentry's User ID falls back to the database ID.
+Logout clears the identity. No name, email or phone is added to Sentry.
+Errors before authentication cannot be attributed to an account, and historical
+events are not backfilled. Deploy the backend and ship the mobile JS changes
+to see numbers in new reports.
+
+### Apple In-App Purchase (iOS)
+
+iOS paywalls and Subscription use direct StoreKit 2 through `expo-iap`, not
+Stripe PaymentSheet. Android/web keep Stripe. iOS does not initialize the
+Stripe provider. Apple prices/currency are read from StoreKit products, not
+the Stripe catalog. Both monthly/yearly Apple products grant all features
+including Борса; the account role still determines posting permissions.
+
+Purchase, Restore Purchases and native App Store subscription management
+are wired. Access always comes from the authenticated backend's official Apple
+JWS verification and App Store Server API status, never a client access claim. Confirmation errors
+after payment warn against paying again. SDK operations are serialized and
+the server-issued private `appAccountToken` UUID is rechecked after a purchase.
+Listeners are installed before requesting a purchase. Signed transactions are
+finished only after server verification/persistence; unfinished transactions
+are recovered at launch/foreground. User-triggered restore calls StoreKit sync.
+Different AgroGrain accounts cannot share/transfer an Apple purchase.
+Existing Stripe/bank access and prepaid periods block new Apple purchases
+until they end; they are not canceled or converted automatically.
+
+**External setup required before release:**
+
+1. In App Store Connect, for bundle `bg.agrograin.mobile`, create ONE
+   auto-renewable subscription group with `bg.agrograin.mobile.full.month`
+   (one month) and `bg.agrograin.mobile.full.year` (one year). Set App Store
+   prices (intended EUR 50/month and EUR 500/year, subject to available Apple
+   price points), availability, localized names/descriptions, review
+   screenshot and review notes. Complete Paid Apps agreements/tax/banking.
+   Do not add an Apple introductory trial: the existing registration month
+   needs no payment details and is independent of Apple.
+2. Create an In-App Purchase signing key in App Store Connect -> Users and
+   Access -> Integrations -> In-App Purchase (Admin required). Configure its
+   `.p8` key, key ID, issuer ID, numeric app Apple ID and bundle ID **only on
+   the backend** (see web README). No RevenueCat account or mobile SDK key is needed.
+3. The app requires login before buying. Every purchase includes the account's
+   UUID, checked against Apple's signed transaction. Restore
+   requires the same AgroGrain profile and Apple ID. Deleting a profile does
+   not cancel Apple billing and prevents restoring it to a newly created
+   profile; warn the user and use support for ownership recovery.
+4. In App Store Connect set App Store Server Notifications to version 2 and
+   the backend's `/api/apple/notifications` URL, for production and sandbox.
+   Notifications are authenticated by Apple's JWS signature, not a bearer secret.
+5. Deploy the backend migration and signing credentials (see web README).
+   The local Apple migration is not applied by this change.
+   Use a sandbox-enabled staging
+   backend for development/TestFlight; review builds also make sandbox
+   purchases, so ensure their backend explicitly permits them.
+6. Build a new binary: `npx eas-cli@latest build --platform ios --profile production`,
+   then `npx eas-cli@latest submit --platform ios`. Native IAP cannot be
+   installed with an OTA update or tested in Expo Go.
+
+Tests cover native purchase/restore wiring, cancellation, server confirmation,
+account changes, duplicate-payment prevention and Android Stripe regression.
+They do **not** replace a real sandbox transaction. Before submission test
+purchase, cancellation, interrupted/pending payment, restore after reinstall,
+wrong-profile restore, monthly/yearly changes in App Store, renewal, billing
+grace, refund/revocation and expiry; verify backend access and Apple admin/
+report rows. Supply a working review login and include the subscriptions in
+the app's first IAP submission. Add policy links in App Store metadata.
+Apple receipts/refunds are handled by Apple. Profile deletion warns users
+to cancel in App Store first; it never claims Apple billing was canceled.
+
+### Trader registration trial
+
+New trader self-registrations receive one calendar month of full access from
+the server without payment details. Email and completed Google/Apple signup
+share the policy. `/me` exposes optional `trialActive`/`trialEndsAt` fields;
+Profile and Subscription show the end date and no automatic charge.
+The app rechecks `/me` at expiry and displays the payment gate. Paid access
+takes precedence; purchasing during the trial starts billing immediately.
+Older API payloads remain compatible. Deploy the backend trial migration
+before enabling registration in the updated app.
+
+### iOS upload permission descriptions
+
+Apple rejected build 1 with ITMS-90683 for missing camera and photo-library
+purpose strings. Both keys are configured in `app.json`, not generated native
+files. Stripe PaymentSheet includes optional camera-based card scanning.
+The app has no photo-library feature; its description explicitly states this
+rather than claiming uploads are implemented. Apple's static scan can flag
+linked APIs even if unused. If review requires a concrete photo use case,
+identify/remove the unused native reference rather than inventing a feature.
+These plist changes require a new iOS binary and build number.
+
+### Support access
+
+Profile includes a Help group with "Помощ и поддръжка". It opens the public
+support form in the device browser at `https://agrograinhub.bg/support`;
+`EXPO_PUBLIC_SUPPORT_URL` can override this for staging. Opening failures
+are logged and display the support email instead of failing silently.
+
 ### Full-access subscriptions
 
 Each role has one plan: Стопанин for farmers and Търговец for traders, with

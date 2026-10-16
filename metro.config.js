@@ -1,6 +1,7 @@
-const { getDefaultConfig } = require("expo/metro-config");
+const { getSentryExpoConfig } = require("@sentry/react-native/metro");
 
-const config = getDefaultConfig(__dirname);
+// Sentry's serializer stamps a Debug ID on each bundle so uploaded source maps match.
+const config = getSentryExpoConfig(__dirname);
 
 // Metro's default is one transform worker per CPU core. On some Windows
 // machines that crashes Node with a native segmentation fault (exit code
