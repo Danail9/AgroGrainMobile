@@ -18,6 +18,7 @@ import { DialogHost } from "@/ui/Dialog";
 import { BiometricBoundary, BiometricOffer } from "@/ui/BiometricLock";
 import { Button } from "@/ui/forms";
 import { GATE_COPY, Gate } from "@/ui/Gate";
+import { AppOpenTracker } from "@/ui/AppOpenTracker";
 
 // Keep the splash up until the stored session has been read, so a signed-in
 // user never sees a flash of the sign-in screen.
@@ -86,6 +87,7 @@ function RootLayout() {
           <BillingProvider>
             <StatusBar style="dark" />
             <SessionSplash />
+            <AppOpenTracker />
             <BiometricSession>
               <Navigator />
               <DialogHost />

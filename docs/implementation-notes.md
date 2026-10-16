@@ -19,6 +19,18 @@ The spec is the intent; this file is what exists.
 
 ## Verified, and how
 
+### Last app open
+
+`AppOpenTracker` reports `POST /api/v1/app-open` after authentication on a
+foreground launch and whenever the app returns to the foreground, including
+the paywall/admin gates. Background launches, screen navigation and duplicate
+active events do not count. The backend records server time in
+`User.lastOpenedAt`, shared with web tab opens/returns; `lastLoginAt` remains
+the sign-in timestamp. Failed/offline reports are logged, not queued.
+Deploy the backend migration `20261016073000_user_last_opened` before shipping
+the mobile JS update. Existing users show no data until their first reported
+open; historical opens are not reconstructed.
+
 ### Sentry account identification
 
 Authenticated reports use the readable account number (for example `"58"`) as
