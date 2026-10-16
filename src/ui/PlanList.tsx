@@ -2,14 +2,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useStripe } from "@stripe/stripe-react-native";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Linking, Platform, Pressable, View } from "react-native";
 import { z } from "zod";
 
 import { api, isApiError } from "@/api/client";
 import { keys, usePlans, useStartCheckout } from "@/api/queries";
 import { meSchema, type Me } from "@/api/schemas";
 import { STRIPE_PUBLISHABLE_KEY } from "@/config";
-import { formatShortDate } from "@/lib/format";
+import { formatShortDate, formatEuro } from "@/lib/format";
 import { planTierLabel } from "@/lib/plans";
 import { colors, radius, space } from "@/theme/tokens";
 import { showDialog } from "@/ui/Dialog";
@@ -18,14 +18,12 @@ import { Icon } from "@/ui/Icon";
 import { Card, Pill, pressedStyle } from "@/ui/primitives";
 import { QueryBoundary } from "@/ui/QueryBoundary";
 import { AppText } from "@/ui/Text";
+import { ApplePlanList } from "@/ui/ApplePlanList";
 
 type Plan = NonNullable<ReturnType<typeof usePlans>["data"]>["plans"][number];
 type BillingInterval = Plan["interval"];
 
-function formatEuro(cents: number) {
-  const value = cents / 100;
-  return `${Number.isInteger(value) ? value : value.toFixed(2).replace(".", ",")} €`;
-}
+export { formatEuro };
 
 function Features({ items, muted }: { items: string[]; muted?: boolean }) {
   return (
@@ -51,6 +49,18 @@ function Features({ items, muted }: { items: string[]; muted?: boolean }) {
  * happens in Stripe's PaymentSheet; paid plan changes start at the next renewal.
  */
 export function PlanList({
+  role,
+  onChanged,
+}: {
+  role: Me["user"]["role"];
+  onChanged: () => void;
+}) {
+  return Platform.OS === "ios"
+    ? <ApplePlanList role={role} onChanged={onChanged} />
+    : <StripePlanList role={role} onChanged={onChanged} />;
+}
+
+function StripePlanList({
   role,
   onChanged,
 }: {
@@ -193,6 +203,20 @@ export function PlanList({
   return (
     <QueryBoundary query={plans} stamp={false}>
       {({ plans: list, current, scheduledChange }) => {
+        if (current?.paymentMethod === "APPLE") {
+          return (
+            <Card style={{ gap: space.md }}>
+              <AppText bold>Apple абонамент</AppText>
+              <AppText variant="small" tone="muted">
+                Управлявай плана и подновяването в App Store. Нова Stripe покупка не е нужна.
+              </AppText>
+              <FormMessage error={error} />
+              <Button title="Управлявай в App Store" variant="secondary"
+                onPress={() => void Linking.openURL("https://apps.apple.com/account/subscriptions").catch((e: unknown) =>
+                  setError(e instanceof Error ? e.message : "App Store не може да се отвори."))} />
+            </Card>
+          );
+        }
         const interval = billingInterval ?? current?.interval ?? "MONTH";
         const rolePlans = list.filter((plan) =>
           (role === "FARMER" && plan.tier === "BASE") || (role === "TRADER" && plan.tier === "TRADER"),

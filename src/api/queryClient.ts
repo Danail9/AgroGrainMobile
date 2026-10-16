@@ -1,12 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
-import { QueryClient, onlineManager } from "@tanstack/react-query";
+import { QueryClient, onlineManager, defaultShouldDehydrateQuery, type Query } from "@tanstack/react-query";
 import { AppState } from "react-native";
 
 import { isApiError } from "@/api/client";
 import { CACHE_MAX_AGE, keys } from "@/api/queries";
 import { APP_VERSION } from "@/config";
+import { reportError } from "@/lib/monitoring";
 
 /**
  * A 4xx answer is a verdict, not a glitch: retrying a 403 or 404 only delays
@@ -45,6 +46,10 @@ export const persistOptions = {
   maxAge: CACHE_MAX_AGE,
   // A new app version may change response shapes; never hydrate the old ones.
   buster: APP_VERSION,
+  dehydrateOptions: {
+    shouldDehydrateQuery: (query: Query) =>
+      query.meta?.persist !== false && defaultShouldDehydrateQuery(query),
+  },
 };
 
 /**
@@ -66,7 +71,7 @@ export function watchNotificationFreshness(client: QueryClient = queryClient) {
   const refresh = () => {
     if (!onlineManager.isOnline()) return;
     void client.invalidateQueries({ queryKey: keys.notifications }).catch((error) =>
-      console.error("Refreshing notifications failed", error),
+      reportError("Refreshing notifications failed", error),
     );
   };
   const timer = setInterval(() => {

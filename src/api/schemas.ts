@@ -22,6 +22,7 @@ export const roleSchema = z.enum(["FARMER", "TRADER", "ADMIN"]);
 
 export const publicUserSchema = z.object({
   id: z.string(),
+  number: z.number().int().positive().optional(),
   email: z.string(),
   name: z.string(),
   farmName: z.string().nullable(),
@@ -38,11 +39,14 @@ export const subscriptionSchema = z.object({
   exempt: z.boolean(),
   freeAccess: z.boolean(),
   individualFreeAccess: z.boolean().optional(),
+  trialActive: z.boolean().optional(),
+  trialEndsAt: isoDate.nullable().optional(),
   status: z.enum(["NONE", "INCOMPLETE", "ACTIVE", "PAST_DUE", "CANCELED"]),
   interval: z.enum(["MONTH", "YEAR"]).nullable(),
   tier: z.enum(["BASE", "TRADER"]).nullable(),
   currentPeriodEnd: isoDate.nullable(),
   cancelAtPeriodEnd: z.boolean(),
+  paymentMethod: z.enum(["STRIPE", "COMPLIMENTARY", "BANK_TRANSFER", "APPLE"]).nullable().optional(),
 });
 
 export const scheduledChangeSchema = z.object({
@@ -78,7 +82,7 @@ export const plansSchema = z.object({
       currentPeriodEnd: isoDate.nullable(),
       cancelAtPeriodEnd: z.boolean(),
       managedByAdmin: z.boolean(),
-      paymentMethod: z.enum(["STRIPE", "COMPLIMENTARY", "BANK_TRANSFER"]).nullable().optional(),
+      paymentMethod: z.enum(["STRIPE", "COMPLIMENTARY", "BANK_TRANSFER", "APPLE"]).nullable().optional(),
     })
     .nullable(),
   plans: z.array(

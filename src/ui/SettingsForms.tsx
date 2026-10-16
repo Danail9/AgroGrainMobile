@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, Pressable, StyleSheet, Switch, TextInput, View } from "react-native";
+import { Linking, Modal, Pressable, StyleSheet, Switch, TextInput, View } from "react-native";
 
 import { isApiError } from "@/api/client";
 import {
@@ -353,7 +353,7 @@ export function DeleteAccountForm() {
   function confirm() {
     showDialog({
       title: "Изтриване на профила",
-      message: "Профилът и всички твои данни ще бъдат изтрити окончателно. Това не може да се върне.",
+      message: "Профилът и всички твои данни ще бъдат изтрити окончателно. Това не може да се върне. Ако имаш Apple абонамент, първо го спри в App Store. Изтриването на профила не спира Apple таксуването.",
       icon: "trash-outline",
       tone: "danger",
       dismissable: true,
@@ -369,7 +369,12 @@ export function DeleteAccountForm() {
       <View style={{ gap: space.md }}>
         <AppText variant="caption" tone="muted">
           Изтрива профила ти и всичките му данни окончателно.
+          Apple абонаментът не се прекратява автоматично. Спри го в App Store преди изтриване.
         </AppText>
+        <FormMessage error={error} />
+        <Button title="Абонаменти в App Store" variant="secondary"
+          onPress={() => void Linking.openURL("https://apps.apple.com/account/subscriptions").catch((e: unknown) =>
+            setError(e instanceof Error ? e.message : "App Store не може да се отвори."))} />
         <Button title="Изтрий профила" variant="danger" icon="trash-outline" onPress={() => setOpen(true)} />
       </View>
     );

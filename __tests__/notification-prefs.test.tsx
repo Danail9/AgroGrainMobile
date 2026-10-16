@@ -9,6 +9,7 @@ jest.mock("@/api/queries", () => ({
 }));
 jest.mock("@/lib/push", () => ({
   pushSupported: () => false,
+  pushUnavailableReason: () => null,
   enablePush: jest.fn(),
   disablePush: jest.fn(),
 }));

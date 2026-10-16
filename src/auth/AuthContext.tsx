@@ -17,6 +17,7 @@ import type { SocialCredential } from "@/lib/social-sign-in";
 import { disablePush } from "@/lib/push";
 import { writeBiometricLock } from "@/lib/biometrics";
 import { z } from "zod";
+import { identifyUser, reportError } from "@/lib/monitoring";
 
 const SESSION_KEY = "ag.session";
 
@@ -54,7 +55,7 @@ async function clearStoredBiometricLock() {
   try {
     await writeBiometricLock(false);
   } catch (e) {
-    console.error("Clearing biometric lock after session ended failed", e);
+    reportError("Clearing biometric lock after session ended failed", e);
   }
 }
 
@@ -123,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await clearStoredBiometricLock();
     await clearCache();
     setOfferBiometrics(false);
+    identifyUser(null);
     setStatus("signedOut");
   }, [setSession]);
 
@@ -165,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       await clearCache();
       await setSession({ token: result.token, expiresAt: result.expiresAt });
+      identifyUser(result.user ?? null);
       setOfferBiometrics(true);
       setStatus("signedIn");
     },
@@ -181,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       await clearCache();
       await setSession({ token: result.token, expiresAt: result.expiresAt });
+      identifyUser(result.user ?? null);
       setOfferBiometrics(true);
       setStatus("signedIn");
     },
@@ -204,6 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       pendingSocial.current = null;
       await clearCache();
       await setSession({ token: result.token, expiresAt: result.expiresAt });
+      identifyUser(result.user ?? null);
       setOfferBiometrics(true);
       setStatus("signedIn");
       return { status: "signedIn" };

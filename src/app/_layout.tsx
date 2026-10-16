@@ -3,7 +3,7 @@ import { StripeProvider } from "@stripe/stripe-react-native";
 import { SplashScreen, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, type ReactNode } from "react";
-import { Linking } from "react-native";
+import { Linking, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { useVersion } from "@/api/queries";
@@ -11,6 +11,7 @@ import { persistOptions, queryClient, watchConnectivity, watchGates, watchNotifi
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { BiometricProvider } from "@/auth/BiometricContext";
 import { APP_VERSION, STORE_URL, STRIPE_PUBLISHABLE_KEY } from "@/config";
+import { wrapRoot } from "@/lib/monitoring";
 import { isUnsupported } from "@/lib/version";
 import { colors } from "@/theme/tokens";
 import { DialogHost } from "@/ui/Dialog";
@@ -74,7 +75,7 @@ function Navigator() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   useEffect(() => watchConnectivity(), []);
   useEffect(() => watchGates(), []);
 
@@ -82,10 +83,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
         <AuthProvider>
-          <StripeProvider
-            publishableKey={STRIPE_PUBLISHABLE_KEY}
-            urlScheme="agrograin"
-          >
+          <BillingProvider>
             <StatusBar style="dark" />
             <SessionSplash />
             <BiometricSession>
@@ -93,9 +91,20 @@ export default function RootLayout() {
               <DialogHost />
               <BiometricOffer />
             </BiometricSession>
-          </StripeProvider>
+          </BillingProvider>
         </AuthProvider>
       </PersistQueryClientProvider>
     </SafeAreaProvider>
+  );
+}
+
+export default wrapRoot(RootLayout);
+
+function BillingProvider({ children }: { children: ReactNode }) {
+  if (Platform.OS === "ios") return children;
+  return (
+    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} urlScheme="agrograin">
+      <>{children}</>
+    </StripeProvider>
   );
 }

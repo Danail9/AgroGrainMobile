@@ -13,6 +13,8 @@
       "bundleIdentifier": "bg.agrograin.mobile",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "AgroGrain използва камерата, ако избереш да сканираш платежната си карта при въвеждане на данни за плащане.",
+        "NSPhotoLibraryUsageDescription": "AgroGrain не използва снимките ти за основните си функции. Вградените библиотеки включват поддръжка за достъп до снимки; достъп се предоставя само с твое разрешение.",
         "NSSpeechRecognitionUsageDescription": "AgroGrain използва разпознаване на реч, за да превърне гласа ти в текст.",
         "NSMicrophoneUsageDescription": "AgroGrain използва микрофона, за да можеш да задаваш въпроси с глас."
       },
@@ -84,7 +86,8 @@
           "enableGooglePay": false
         }
       ],
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "expo-iap"
     ],
     "extra": {
       "router": {},

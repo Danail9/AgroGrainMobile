@@ -17,6 +17,19 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     plugins.push(["@react-native-google-signin/google-signin", { iosUrlScheme }]);
   }
 
+  // Source-map upload runs inside the native build and fails it without a token,
+  // so the Sentry build step is only added when uploads are actually configured.
+  if (process.env.SENTRY_AUTH_TOKEN) {
+    plugins.push([
+      "@sentry/react-native/expo",
+      {
+        url: process.env.SENTRY_URL ?? "https://sentry.io/",
+        organization: process.env.SENTRY_ORG,
+        project: process.env.SENTRY_PROJECT,
+      },
+    ]);
+  }
+
   const personalTeam = process.env.IOS_PERSONAL_TEAM === "1";
   if (personalTeam) {
     plugins.unshift("./plugins/withIosPersonalTeam");

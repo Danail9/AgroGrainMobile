@@ -1,10 +1,14 @@
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { router } from "expo-router";
+import { Platform } from "react-native";
 
 import { api } from "@/api/client";
 import { plansSchema } from "@/api/schemas";
 import { showDialog } from "@/ui/Dialog";
 import { PlanList } from "@/ui/PlanList";
+
+beforeEach(() => { jest.replaceProperty(Platform, "OS", "android"); });
+afterAll(() => { jest.restoreAllMocks(); });
 
 jest.mock("@/ui/Dialog", () => ({ showDialog: jest.fn() }));
 jest.mock("@/config", () => ({ STRIPE_PUBLISHABLE_KEY: "pk_test_placeholder" }));

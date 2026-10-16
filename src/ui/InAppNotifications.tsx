@@ -11,6 +11,7 @@ import { colors, radius, shadowCard, space } from "@/theme/tokens";
 import { FormMessage } from "@/ui/forms";
 import { Icon } from "@/ui/Icon";
 import { AppText } from "@/ui/Text";
+import { reportError } from "@/lib/monitoring";
 
 type Notification = z.infer<typeof notificationsSchema>["items"][number];
 type BannerPreference = {
@@ -43,7 +44,7 @@ export function InAppNotifications({
         setBusy(false);
       }
     }).catch((cause) => {
-      console.error("Reading in-app notification preference failed", cause);
+      reportError("Reading in-app notification preference failed", cause);
       if (!cancelled) {
         setError("Не успяхме да прочетем настройката за банери. Опитай да я запазиш отново.");
         setBusy(false);
@@ -83,7 +84,7 @@ export function InAppNotifications({
       setEnabledState(value);
       setBanner(null);
     } catch (cause) {
-      console.error("Saving in-app notification preference failed", cause);
+      reportError("Saving in-app notification preference failed", cause);
       setError("Настройката за банери не е запазена. Опитай отново.");
     } finally {
       writing.current = false;

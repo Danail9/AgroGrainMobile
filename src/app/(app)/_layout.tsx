@@ -13,6 +13,8 @@ import { PushRegistrar } from "@/ui/PushRegistrar";
 import { Paywall } from "@/ui/Paywall";
 import { ErrorState, Loading } from "@/ui/QueryBoundary";
 import { InAppNotifications } from "@/ui/InAppNotifications";
+import { identifyUser } from "@/lib/monitoring";
+import { useAppleBillingSync } from "@/lib/useAppleBillingSync";
 
 export const unstable_settings = { initialRouteName: "(tabs)" };
 
@@ -23,9 +25,35 @@ export const unstable_settings = { initialRouteName: "(tabs)" };
  */
 export default function AppLayout() {
   const me = useMe();
+  useAppleBillingSync(me.data?.user.id, me.data?.user.role);
+  const userId = me.data?.user.id;
+  const userNumber = me.data?.user.number;
+  const userRole = me.data?.user.role;
+  useEffect(() => {
+    if (userId) identifyUser({ id: userId, number: userNumber, role: userRole });
+  }, [userId, userNumber, userRole]);
   const refetchMe = me.refetch;
+  const trialActive = me.data?.subscription.trialActive;
+  const trialEndsAt = trialActive
+    ? me.data?.subscription.trialEndsAt
+    : me.data?.subscription.paymentMethod === "APPLE" ? me.data.subscription.currentPeriodEnd : null;
+  useEffect(() => {
+    if (!trialEndsAt) return;
+    const expiresAt = new Date(trialEndsAt).getTime();
+    let timer: ReturnType<typeof setTimeout>;
+    function checkExpiry() {
+      const remaining = expiresAt - Date.now();
+      if (remaining <= 0) {
+        void refetchMe();
+      } else {
+        timer = setTimeout(checkExpiry, Math.min(remaining, 2_147_483_647));
+      }
+    }
+    checkExpiry();
+    return () => clearTimeout(timer);
+  }, [trialActive, trialEndsAt, refetchMe]);
 
-  // Coming back from the Stripe checkout in the browser picks up the new plan.
+  // Recheck server access when returning from checkout or store management.
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "active") void refetchMe();
@@ -87,6 +115,7 @@ export default function AppLayout() {
     return (
       <Paywall
         role={user.role}
+        subscription={subscription}
         checking={me.isFetching}
         onRefresh={() => void me.refetch()}
         actions={<SignOutButton />}

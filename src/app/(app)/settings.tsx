@@ -23,6 +23,8 @@ import {
   RegionForm,
 } from "@/ui/SettingsForms";
 import { SettingsGroup, SettingsRow } from "@/ui/SettingsList";
+import { SupportLink } from "@/ui/SupportLink";
+import { TrialNotice } from "@/ui/TrialNotice";
 import { AppText } from "@/ui/Text";
 
 type Section = "profile" | "password" | "region" | "notifications" | "delete" | "biometrics";
@@ -86,6 +88,8 @@ export default function SettingsScreen() {
                 </View>
               </View>
 
+              <TrialNotice subscription={subscription} />
+
               <SettingsGroup title="Акаунт">
                 <SettingsRow
                   first
@@ -144,6 +148,10 @@ export default function SettingsScreen() {
                   <InAppNotificationSettings />
                   <NotificationPrefsForm prefs={notificationPrefs} role={user.role} />
                 </SettingsRow>
+              </SettingsGroup>
+
+              <SettingsGroup title="Помощ">
+                <SupportLink />
               </SettingsGroup>
 
               <SettingsGroup>
