@@ -96,5 +96,8 @@ src/theme/      colour, spacing and type tokens from the portal's globals.css
   second phone is refused until the first signs out or an admin approves it.
 - **Offline.** Reads come from a cache kept for 7 days and are labelled "обновено преди …".
   Changes need a connection.
+- The News screen shows the latest USDA WASDE global wheat, corn, and soybean estimates in
+  Bulgarian, with a link to the readable PDF report. These are world supply-and-demand
+  balances, not Bulgarian prices; the portal reads USDA's public monthly XML.
 - Expo APIs change every SDK. Check `https://docs.expo.dev/versions/v57.0.0/` before using one
   from memory, and use `npx expo install` (not `npm install`) for Expo packages.

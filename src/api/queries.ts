@@ -34,6 +34,7 @@ import {
   tradeResponseSchema,
   versionSchema,
   weatherResponseSchema,
+  wasdeSummarySchema,
   weeklyBriefingSchema,
 } from "@/api/schemas";
 
@@ -65,6 +66,7 @@ export const keys = {
   regions: ["regions"] as const,
   daily: ["briefing", "daily"] as const,
   weekly: ["briefing", "weekly"] as const,
+  wasde: ["wasde"] as const,
 };
 
 /** The AI briefings are cached per day on the server, so they expire at midnight. */
@@ -226,6 +228,13 @@ export const useWeeklyBriefing = () =>
     queryKey: keys.weekly,
     queryFn: ({ signal }) => api("/ai/briefing/weekly", { schema: weeklyBriefingSchema, signal }),
     staleTime: untilMidnight(),
+  });
+
+export const useWasdeSummary = () =>
+  useQuery({
+    queryKey: keys.wasde,
+    queryFn: ({ signal }) => api("/ai/wasde", { schema: wasdeSummarySchema, signal }),
+    staleTime: 6 * HOUR,
   });
 
 /* -------------------------------------------------------------- mutations */

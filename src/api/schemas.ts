@@ -389,6 +389,23 @@ export const weeklyBriefingSchema = z.object({
   periodEnd: isoDate,
 });
 
+export const wasdeSummarySchema = z.object({
+  reportMonth: z.string(),
+  sourceUrl: z.url(),
+  unit: z.string(),
+  comparisonMonth: z.string().nullable(),
+  highlights: z.array(z.string()),
+  estimates: z.array(z.object({
+    commodity: z.string(),
+    marketYear: z.string(),
+    production: z.number().nullable(),
+    totalUse: z.number().nullable(),
+    endingStocks: z.number().nullable(),
+    productionChange: z.number().nullable(),
+    endingStocksChange: z.number().nullable(),
+  })),
+});
+
 export const chatReplySchema = z.object({
   content: z.string(),
   source: z.string(),

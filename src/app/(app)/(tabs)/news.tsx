@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { Image, Pressable, StyleSheet, View } from "react-native";
 import type { z } from "zod";
 
-import { useNews } from "@/api/queries";
+import { useNews, useWasdeSummary } from "@/api/queries";
 import type { newsListItemSchema } from "@/api/schemas";
 import { relativeTime } from "@/lib/format";
 import { groupNewsByDay } from "@/lib/news";
@@ -12,6 +12,7 @@ import { QueryBoundary } from "@/ui/QueryBoundary";
 import { Screen } from "@/ui/Screen";
 import { Tabs } from "@/ui/Tabs";
 import { AppText } from "@/ui/Text";
+import { WasdeSummaryCard } from "@/ui/WasdeSummaryCard";
 
 type Article = z.infer<typeof newsListItemSchema>;
 
@@ -133,6 +134,7 @@ function NewsList({ items, now, featured }: { items: Article[]; now: number; fea
 
 export default function NewsScreen() {
   const news = useNews(null);
+  const wasde = useWasdeSummary();
 
   return (
     <Screen
@@ -140,8 +142,8 @@ export default function NewsScreen() {
       back="/"
       title="Агро новини"
       subtitle="Само най-важното, без излишен шум"
-      onRefresh={() => void news.refetch()}
-      refreshing={news.isRefetching}
+      onRefresh={() => void Promise.all([news.refetch(), wasde.refetch()])}
+      refreshing={news.isRefetching || wasde.isRefetching}
     >
       <QueryBoundary query={news}>
         {({ items }) => {
@@ -158,7 +160,19 @@ export default function NewsScreen() {
             <Tabs
               variant="segmented"
               items={[
-                tab("top", "Всички", items, true),
+                {
+                  ...tab("top", "Всички", items, true),
+                  content: (
+                    <View style={{ gap: space.lg }}>
+                      <WasdeSummaryCard
+                        summary={wasde.data}
+                        loading={wasde.isPending}
+                        error={wasde.isError}
+                      />
+                      <NewsList items={items} now={now} featured />
+                    </View>
+                  ),
+                },
                 tab("bg", "България", filter("BULGARIA")),
                 tab("eu", "ЕС", filter("EU")),
                 tab("market", "Пазар", filter("MARKET")),
