@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import { API_BASE, USER_AGENT } from "@/config";
+import { API_BASE, API_FALLBACK_BASE, USER_AGENT } from "@/config";
 import { apiErrorSchema, refreshResultSchema } from "@/api/schemas";
 
 export type ServerErrorCode = z.infer<typeof apiErrorSchema>["error"]["code"];
@@ -64,6 +64,13 @@ const REQUEST_TIMEOUT_MS = 20_000;
 export const REFRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 let refreshing: Promise<void> | null = null;
+let activeApiBase = API_BASE;
+
+function apiBases() {
+  return [...new Set([activeApiBase, API_BASE, API_FALLBACK_BASE].filter(
+    (base): base is string => base !== null,
+  ))];
+}
 
 async function rawFetch(url: string, init: RequestInit, signal?: AbortSignal) {
   const controller = new AbortController();
@@ -88,6 +95,46 @@ async function rawFetch(url: string, init: RequestInit, signal?: AbortSignal) {
     clearTimeout(timer);
     signal?.removeEventListener("abort", onAbort);
   }
+}
+
+async function fetchApi(path: string, init: RequestInit, signal?: AbortSignal) {
+  const bases = apiBases();
+  const method = init.method ?? "GET";
+  const safeTransportRetry = method === "GET" ||
+    (method === "POST" && path === "/auth/login");
+
+  for (let index = 0; index < bases.length; index += 1) {
+    const base = bases[index];
+    const canFailOver = index < bases.length - 1;
+
+    let response: Response;
+    try {
+      response = await rawFetch(`${base}${path}`, init, signal);
+    } catch (error) {
+      if (
+        !canFailOver ||
+        !safeTransportRetry ||
+        !(error instanceof ApiClientError) ||
+        (error.code !== "network" && !(method === "GET" && error.code === "timeout"))
+      ) {
+        throw error;
+      }
+      continue;
+    }
+
+    if (
+      canFailOver &&
+      safeTransportRetry &&
+      [502, 503, 504].includes(response.status)
+    ) {
+      continue;
+    }
+
+    activeApiBase = base;
+    return response;
+  }
+
+  throw new ApiClientError("network", "Няма връзка с интернет.");
 }
 
 async function readBody(response: Response): Promise<unknown> {
@@ -124,7 +171,7 @@ async function refreshSession() {
   const session = hooks?.getSession();
   if (!session) return;
 
-  const response = await rawFetch(`${API_BASE}/auth/refresh`, {
+  const response = await fetchApi("/auth/refresh", {
     method: "POST",
     headers: headers(session.token),
   });
@@ -181,8 +228,8 @@ export async function api<T>(path: string, options: RequestOptions<T>): Promise<
   if (auth && !options.token) await refreshIfDue();
   const token = options.token ?? (auth ? hooks?.getSession()?.token : undefined);
 
-  const response = await rawFetch(
-    `${API_BASE}${path}`,
+  const response = await fetchApi(
+    path,
     {
       method,
       headers: headers(token, body !== undefined),

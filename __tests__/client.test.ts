@@ -7,7 +7,14 @@ import {
   configureApi,
   type Session,
 } from "@/api/client";
+import { API_BASE, API_FALLBACK_BASE } from "@/config";
 import { shouldRetry } from "@/api/queryClient";
+
+jest.mock("@/config", () => ({
+  API_BASE: "https://www.agrograinhub.com/api/v1",
+  API_FALLBACK_BASE: "https://www.agrograinhub.bg/api/v1",
+  USER_AGENT: "AgroMobile/1.0.0 (iPhone)",
+}));
 
 const DAY = 86_400_000;
 const schema = z.object({ hello: z.string() });
@@ -229,6 +236,71 @@ describe("retry policy", () => {
     expect(shouldRetry(0, err("timeout"))).toBe(true);
     expect(shouldRetry(1, err("server_error", 503))).toBe(true);
     expect(shouldRetry(2, err("network"))).toBe(false);
+  });
+
+  describe("API domain failover", () => {
+    it("retries a gateway-unavailable response on the alternate domain", async () => {
+      if (!API_FALLBACK_BASE) throw new Error("The production fallback domain is not configured");
+      fetchMock
+        .mockResolvedValueOnce(new Response("no available server", { status: 503 }))
+        .mockResolvedValueOnce(json({ data: { hello: "world" } }));
+
+      await expect(api("/x", { schema })).resolves.toEqual({ hello: "world" });
+
+      const requestedUrls = fetchMock.mock.calls.map(([url]) => url);
+      expect(requestedUrls).toHaveLength(2);
+      expect(new Set(requestedUrls)).toEqual(new Set([
+        `${API_BASE}/x`,
+        `${API_FALLBACK_BASE}/x`,
+      ]));
+    });
+
+    it("retries a login on the alternate domain after a gateway-unavailable response", async () => {
+      if (!API_FALLBACK_BASE) throw new Error("The production fallback domain is not configured");
+      fetchMock
+        .mockResolvedValueOnce(new Response("no available server", { status: 503 }))
+        .mockResolvedValueOnce(json({ data: { hello: "world" } }));
+
+      await expect(
+        api("/auth/login", { method: "POST", body: {}, schema, auth: false }),
+      ).resolves.toEqual({ hello: "world" });
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const requestedUrls = fetchMock.mock.calls.map(([url]) => url);
+      expect(new Set(requestedUrls)).toEqual(new Set([
+        `${API_BASE}/auth/login`,
+        `${API_FALLBACK_BASE}/auth/login`,
+      ]));
+    });
+
+    it("does not switch domains for a normal validation error", async () => {
+      fetchMock.mockResolvedValueOnce(
+        json({ error: { code: "validation_failed", message: "Грешен имейл." } }, 400),
+      );
+
+      await expect(api("/auth/login", { method: "POST", body: {}, schema, auth: false }))
+        .rejects.toMatchObject({ code: "validation_failed", status: 400 });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("fails over read requests after a network failure", async () => {
+      fetchMock
+        .mockRejectedValueOnce(new TypeError("Network request failed"))
+        .mockResolvedValueOnce(json({ data: { hello: "world" } }));
+
+      await expect(api("/x", { schema })).resolves.toEqual({ hello: "world" });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not replay writes on another domain after a gateway error", async () => {
+      fetchMock.mockResolvedValueOnce(new Response("no available server", { status: 503 }));
+
+      await expect(
+        api("/market/alerts", { method: "POST", body: {}, schema }),
+      ).rejects.toMatchObject({ code: "server_error", status: 503 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("never retries a verdict from the server", () => {

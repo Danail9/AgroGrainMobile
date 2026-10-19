@@ -18,12 +18,7 @@ const TAB: Record<string, TabDef> = {
   ai: { name: "ai", title: "AI", icon: "sparkles-outline", iconActive: "sparkles" },
 };
 
-/**
- * The portal's phone bar is six items; a phone fits five. Farmers lose the
- * news tab and traders lose the weather tab (as in the portal's `TRADER_NAV`),
- * but both screens stay routable, so any link to them still works.
- */
-const FARMER_TABS = [TAB.index, TAB.weather, TAB.market, TAB.trade, TAB.ai];
+const FARMER_TABS = [TAB.index, TAB.weather, TAB.market, TAB.trade, TAB.news, TAB.ai];
 const TRADER_TABS = [TAB.dashboard, TAB.trade, TAB.market, TAB.news, TAB.ai];
 const ALL = ["index", "weather", "market", "trade", "news", "ai"];
 

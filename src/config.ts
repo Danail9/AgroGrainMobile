@@ -25,6 +25,26 @@ function resolveApiUrl() {
 export const API_URL = resolveApiUrl();
 export const API_BASE = `${API_URL}/api/v1`;
 
+function alternateApiBase(base: string) {
+  try {
+    const url = new URL(base);
+    const alternateHosts: Record<string, string> = {
+      "agrograinhub.com": "agrograinhub.bg",
+      "www.agrograinhub.com": "www.agrograinhub.bg",
+      "agrograinhub.bg": "agrograinhub.com",
+      "www.agrograinhub.bg": "www.agrograinhub.com",
+    };
+    const alternateHost = alternateHosts[url.hostname];
+    if (!alternateHost) return null;
+    url.hostname = alternateHost;
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
+export const API_FALLBACK_BASE = alternateApiBase(API_BASE);
+
 export const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 
 /**

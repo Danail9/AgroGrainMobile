@@ -70,7 +70,7 @@ export function WasdeSummaryCard({
           <AppText variant="caption" tone="brand" bold>USDA · WASDE</AppText>
           <AppText variant="body" bold>Световен баланс</AppText>
           <AppText variant="caption" tone="muted">
-            {summary.reportMonth} · млн. метрични тона
+            {summary.reportMonth} · количествата са в млн. метрични тона
           </AppText>
         </View>
         <View style={styles.globalBadge}>
@@ -78,31 +78,33 @@ export function WasdeSummaryCard({
         </View>
       </View>
 
-      <View style={styles.table}>
-        <View style={styles.tableHeader}>
-          <View style={styles.cropColumn} />
-          <AppText variant="caption" tone="muted" style={styles.metricColumn}>
-            Производство
-          </AppText>
-          <AppText variant="caption" tone="muted" style={styles.metricColumn}>
-            Крайни запаси
-          </AppText>
-        </View>
+      <View style={styles.cropList}>
         {summary.estimates.map((estimate) => (
-          <View key={`${estimate.commodity}-${estimate.marketYear}`} style={styles.cropRow}>
-            <View style={styles.cropColumn}>
+          <View key={`${estimate.commodity}-${estimate.marketYear}`} style={styles.cropCard}>
+            <View style={styles.cropHeading}>
               <AppText variant="small" bold numberOfLines={1}>{estimate.commodity}</AppText>
-              <AppText variant="caption" tone="muted">{estimate.marketYear}</AppText>
+              <AppText variant="caption" tone="muted">Сезон {estimate.marketYear}</AppText>
             </View>
-            <AppText variant="small" numeric bold style={styles.metricColumn}>
-              {estimate.production === null ? "—" : formatNumber(estimate.production, 2)}
-            </AppText>
-            <AppText variant="small" numeric bold style={styles.metricColumn}>
-              {estimate.endingStocks === null ? "—" : formatNumber(estimate.endingStocks, 2)}
-            </AppText>
+            <View style={styles.metrics}>
+              <View style={styles.metric}>
+                <AppText variant="caption" tone="muted">Производство</AppText>
+                <AppText variant="small" numeric bold>
+                  {estimate.production === null ? "—" : formatNumber(estimate.production, 2)}
+                </AppText>
+              </View>
+              <View style={styles.metric}>
+                <AppText variant="caption" tone="muted">Остава в края на сезона</AppText>
+                <AppText variant="small" numeric bold>
+                  {estimate.endingStocks === null ? "—" : formatNumber(estimate.endingStocks, 2)}
+                </AppText>
+              </View>
+            </View>
           </View>
         ))}
       </View>
+      <AppText variant="caption" tone="muted">
+        Оставащо количество след потреблението за сезона.
+      </AppText>
 
       <Pressable
         accessibilityRole="button"
@@ -121,14 +123,20 @@ export function WasdeSummaryCard({
           <AppText variant="caption" tone="muted" bold>{comparison}</AppText>
           {summary.estimates.map((estimate) => (
             <View key={`${estimate.commodity}-${estimate.marketYear}-details`} style={styles.detailRow}>
-              <AppText variant="caption" bold style={{ flex: 1 }}>{estimate.commodity}</AppText>
-              <View style={styles.detailValues}>
-                <AppText variant="caption" tone="muted">
-                  Потребление {estimate.totalUse === null ? "—" : formatNumber(estimate.totalUse, 2)}
+              <View style={styles.detailHeading}>
+                <AppText variant="small" bold>{estimate.commodity}</AppText>
+                <AppText variant="caption" tone="muted">{estimate.marketYear}</AppText>
+              </View>
+              <View style={styles.detailMetric}>
+                <AppText variant="caption" tone="muted">Общо потребление</AppText>
+                <AppText variant="caption" numeric bold>
+                  {estimate.totalUse === null
+                    ? "—"
+                    : `${formatNumber(estimate.totalUse, 2)} млн. т`}
                 </AppText>
                 {estimate.productionChange !== null || estimate.endingStocksChange !== null ? (
                   <AppText variant="caption" tone="muted">
-                    Промяна: произв. {formatChange(estimate.productionChange)}, запаси {formatChange(estimate.endingStocksChange)}
+                    {`Промяна: производство ${formatChange(estimate.productionChange)}, наличност в края на сезона ${formatChange(estimate.endingStocksChange)} млн. т`}
                   </AppText>
                 ) : null}
               </View>
@@ -185,22 +193,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.sm,
     paddingVertical: 5,
   },
-  table: { gap: 0 },
-  tableHeader: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingBottom: space.xs,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.brand[200],
-  },
-  cropColumn: { flex: 1.1, minWidth: 0 },
-  metricColumn: { flex: 1, textAlign: "right" },
-  cropRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  cropList: { gap: space.sm },
+  cropCard: {
+    gap: space.xs,
     paddingVertical: space.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.brand[100],
+    paddingHorizontal: space.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.white,
+  },
+  cropHeading: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    gap: space.sm,
+  },
+  metrics: { flexDirection: "row", gap: space.sm },
+  metric: {
+    flex: 1,
+    gap: 2,
+    padding: space.sm,
+    borderRadius: radius.sm,
+    backgroundColor: colors.brand[50],
   },
   detailsToggle: {
     minHeight: 40,
@@ -214,8 +227,14 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.white,
   },
-  detailRow: { flexDirection: "row", alignItems: "flex-start", gap: space.sm },
-  detailValues: { flex: 1, gap: 2, alignItems: "flex-end" },
+  detailRow: {
+    gap: space.xs,
+    paddingTop: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
+  },
+  detailHeading: { flexDirection: "row", alignItems: "baseline", gap: space.sm },
+  detailMetric: { gap: 2 },
   pdfButton: {
     minHeight: 48,
     flexDirection: "row",

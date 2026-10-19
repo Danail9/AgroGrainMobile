@@ -19,11 +19,14 @@ What was actually built and what is left: [docs/implementation-notes.md](docs/im
 
 ### Which portal the app talks to
 
-By default the live portal. The address is set in the committed `.env`
-(`EXPO_PUBLIC_API_URL=https://www.agrograinhub.bg`), so a fresh clone works with no setup. It
-holds a public URL only: `EXPO_PUBLIC_` values are bundled into the app and visible to anyone
+By default the live portal. The address is set in the committed `.env` via
+`EXPO_PUBLIC_API_URL`, so a fresh clone works with no setup. It holds a public URL only:
+`EXPO_PUBLIC_` values are bundled into the app and visible to anyone
 who has it, so never put a secret in there. Note this is the **real** database: registering
 creates a real user.
+If the configured AgroGrain `.bg` or `.com` API domain returns a gateway-unavailable response,
+the app retries on the alternate domain. It also fails over for network failures on reads and
+login requests; other writes are not replayed after an ambiguous network failure.
 
 To use a portal running on your own PC instead:
 

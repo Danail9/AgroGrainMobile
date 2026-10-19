@@ -4,6 +4,12 @@ import * as Linking from "expo-linking";
 
 import { WasdeSummaryCard } from "@/ui/WasdeSummaryCard";
 
+jest.mock("@/config", () => ({
+  API_BASE: "https://www.agrograinhub.com/api/v1",
+  API_FALLBACK_BASE: "https://www.agrograinhub.bg/api/v1",
+  USER_AGENT: "AgroMobile/1.0.0 (iPhone)",
+}));
+
 jest.mock("expo-linking", () => ({
   openURL: jest.fn().mockResolvedValue(true),
 }));
@@ -27,6 +33,14 @@ describe("WasdeSummaryCard", () => {
             endingStocks: 270,
             productionChange: 5,
             endingStocksChange: 2,
+          }, {
+            commodity: "Ориз (смлян)",
+            marketYear: "2026/27",
+            production: 533.08,
+            totalUse: 600.15,
+            endingStocks: 198.5,
+            productionChange: -0.77,
+            endingStocksChange: 1.51,
           }],
         }}
         loading={false}
@@ -35,14 +49,23 @@ describe("WasdeSummaryCard", () => {
     );
 
     expect(screen.getByText("Световен баланс")).toBeTruthy();
+    expect(screen.getAllByText("Производство")).toHaveLength(2);
+    expect(screen.getAllByText("Остава в края на сезона")).toHaveLength(2);
+    expect(screen.getByText("Оставащо количество след потреблението за сезона.")).toBeTruthy();
+    expect(screen.getAllByText("Сезон 2026/27")).toHaveLength(2);
+    expect(screen.getByText(/количествата са в млн\. метрични тона/)).toBeTruthy();
     expect(screen.getByText("825,00")).toBeTruthy();
     expect(screen.getByText("270,00")).toBeTruthy();
+    expect(screen.getByText("Ориз (смлян)")).toBeTruthy();
+    expect(screen.getByText("533,08")).toBeTruthy();
+    expect(screen.getByText("198,50")).toBeTruthy();
     expect(screen.getByText(/не са прогноза или цени за България/)).toBeTruthy();
-    expect(screen.queryByText(/Потребление 810,00/)).toBeNull();
+    expect(screen.queryByText(/810,00 млн\. т/)).toBeNull();
 
     await fireEvent.press(screen.getByText("Подробности и промени"));
-    expect(screen.getByText(/Потребление 810,00/)).toBeTruthy();
-    expect(screen.getByText(/произв\. \+5,00/)).toBeTruthy();
+    expect(screen.getAllByText("Общо потребление")).toHaveLength(2);
+    expect(screen.getByText("810,00 млн. т")).toBeTruthy();
+    expect(screen.getByText("Промяна: производство +5,00, наличност в края на сезона +2,00 млн. т")).toBeTruthy();
 
     await fireEvent.press(screen.getByText("Пълен доклад (PDF)"));
     expect(Linking.openURL).toHaveBeenCalledWith(sourceUrl);
