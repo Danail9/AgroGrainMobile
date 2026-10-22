@@ -21,6 +21,8 @@ export function findMarketRow(title: string, prices: readonly PriceRow[] | undef
 /** How far a price is from today's market price, in %; null when it cannot be compared. */
 export function marketDelta(price: number | null, unit: string, row: PriceRow | null) {
   if (price === null || !row || !row.price || row.unit !== unit) return null;
+  // Trade listings do not identify a delivery port, so their basis is not comparable.
+  if (row.portPrices || (row.delivery && row.delivery !== "NATIONAL")) return null;
   return ((price - row.price) / row.price) * 100;
 }
 

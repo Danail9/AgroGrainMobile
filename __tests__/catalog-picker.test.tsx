@@ -38,7 +38,7 @@ describe("catalogSections", () => {
   });
 });
 
-function Harness() {
+function Harness({ marketPrices = prices }: { marketPrices?: PriceRow[] }) {
   const [choice, setChoice] = useState("");
   const [custom, setCustom] = useState("");
   return (
@@ -54,7 +54,7 @@ function Harness() {
       onChoice={setChoice}
       onCustom={setCustom}
       placeholder="Люцерна"
-      prices={prices}
+      prices={marketPrices}
       favorites={["wheat"]}
       />
     </SafeAreaProvider>
@@ -62,6 +62,19 @@ function Harness() {
 }
 
 describe("CatalogPicker", () => {
+  it("labels both port quotes instead of presenting one as a national market price", async () => {
+    const marketPrices: PriceRow[] = [{
+      ...prices[0], portPrices: [
+        { destination: "VARNA", label: "Доставено до пристанище Варна", price: 205, date: "2026-10-20" },
+        { destination: "BURGAS", label: "Доставено до пристанище Бургас", price: 210.5, date: "2026-10-20" },
+      ],
+    }];
+    await render(<Harness marketPrices={marketPrices} />);
+    await fireEvent.press(screen.getByLabelText("Избери Пшеница"));
+    expect(screen.getByText("Варна: 205 €/т\nБургас: 210,50 €/т")).toBeTruthy();
+    expect(screen.queryByText(/Пазарна цена днес/)).toBeNull();
+  });
+
   it("picks a crop from the searchable sheet and shows its market price", async () => {
     await render(<Harness />);
     await fireEvent.press(screen.getByLabelText("Избери култура"));

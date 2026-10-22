@@ -12,7 +12,6 @@ import {
 } from "@/api/queries";
 import type { Me } from "@/api/schemas";
 import { useAuth } from "@/auth/AuthContext";
-import { normalizeDecimal } from "@/lib/forms";
 import { PHONE_CODES, PHONE_COUNTRIES, phoneInput, splitPhone } from "@/lib/phone";
 import { disablePush, enablePush, pushSupported, pushUnavailableReason } from "@/lib/push";
 import { colors, radius, space } from "@/theme/tokens";
@@ -441,16 +440,14 @@ function Toggle({
 }
 
 /**
- * Alert preferences. Each switch saves on its own; the threshold saves from
- * its button. The phone-alerts switch only appears in builds that can receive
- * push (not Expo Go).
+ * Each switch saves on its own. The phone-alerts switch only appears in
+ * builds that can receive push (not Expo Go).
  */
 export function NotificationPrefsForm({ prefs, role }: {
   prefs: Me["notificationPrefs"];
   role: Me["user"]["role"];
 }) {
   const update = useUpdatePrefs();
-  const [threshold, setThreshold] = useState(String(prefs.priceThreshold));
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -510,46 +507,14 @@ export function NotificationPrefsForm({ prefs, role }: {
           {pushUnavailableReason()}
         </AppText>
       )}
-      <AppText variant="small" bold>Пазарни цени</AppText>
+      <AppText variant="small" bold>Цени</AppText>
       <Toggle
-        label="Промяна в цените"
-        hint="Когато дневната промяна надвиши прага по-долу."
+        label="Актуализации на цените"
+        hint="При промяна на цените на култури и торове. Едно известие за всяко запазване, включително масово."
         value={prefs.priceMove}
         disabled={!prefs.enabled || update.isPending}
         onChange={(priceMove) => save({ priceMove }, "Настройките са запазени.")}
       />
-      <Divider />
-      <Toggle
-        label="Целеви цени"
-        hint="Когато култура достигне цената, която си задал в „Пазар“."
-        value={prefs.priceTarget ?? true}
-        disabled={!prefs.enabled || update.isPending}
-        onChange={(priceTarget) => save({ priceTarget }, "Настройките са запазени.")}
-      />
-      <Divider />
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: space.md, paddingVertical: 10 }}>
-        <View style={{ flex: 1 }}>
-          <TextField
-            label="Праг на промяната"
-            suffix="%"
-            value={threshold}
-            onChangeText={setThreshold}
-            keyboardType="decimal-pad"
-          />
-        </View>
-        <View style={{ width: 110 }}>
-          <Button
-            compact
-            variant="secondary"
-            title="Запази"
-            loading={update.isPending}
-            disabled={!prefs.enabled}
-            onPress={() =>
-              save({ priceThreshold: Number(normalizeDecimal(threshold)) }, "Настройките са запазени.")
-            }
-          />
-        </View>
-      </View>
       <Divider />
       <AppText variant="small" bold>Време и полска работа</AppText>
       <Toggle
@@ -676,7 +641,7 @@ export function RegionForm({ user }: { user: Me["user"] }) {
         }}
       />
       <AppText variant="caption" tone="muted">
-        Регионът определя прогнозата за времето и регионалните цени.
+        Регионът определя прогнозата за времето.
       </AppText>
     </View>
   );

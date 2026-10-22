@@ -12,6 +12,14 @@ import { AppText } from "@/ui/Text";
 
 export const OTHER = "__other__";
 
+function quoteSummary(market: PriceRow) {
+  return market.portPrices
+    ? market.portPrices.map((quote) =>
+      `${quote.destination === "VARNA" ? "Варна" : "Бургас"}: ${formatPrice(quote.price, market.unit)}`,
+    ).join("\n")
+    : `Пазарна цена днес: ${formatPrice(market.price, market.unit)}`;
+}
+
 /**
  * Picks a name from the catalogue in a searchable sheet (favourites first,
  * grouped like the market, with today's price), or takes a typed name when it
@@ -81,7 +89,7 @@ export function CatalogPicker({
               {selected.name}
             </AppText>
             <AppText variant="caption" tone="muted">
-              {market ? `Пазарна цена днес: ${formatPrice(market.price, market.unit)}` : "Няма пазарна цена"}
+              {market ? quoteSummary(market) : "Няма публикувана оферта"}
             </AppText>
           </View>
           <AppText variant="caption" tone="brand" bold>
@@ -244,8 +252,8 @@ function PickerSheet({
                   {item.option.name}
                 </AppText>
                 {item.market ? (
-                  <AppText variant="caption" tone="muted" numeric>
-                    {formatPrice(item.market.price, item.market.unit)}
+                  <AppText variant="caption" tone="muted" numeric style={{ flexShrink: 1 }}>
+                    {quoteSummary(item.market)}
                   </AppText>
                 ) : null}
                 {on ? <Icon name="checkmark" size={18} color={colors.brand[600]} /> : null}

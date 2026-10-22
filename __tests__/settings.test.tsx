@@ -3,13 +3,14 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 import { notificationPrefsSchema, type Me } from "@/api/schemas";
 import { phoneInput } from "@/lib/phone";
 import { initialsOf, notificationSummary } from "@/lib/settings";
-import { PasswordForm, ProfileForm } from "@/ui/SettingsForms";
+import { NotificationPrefsForm, PasswordForm, ProfileForm } from "@/ui/SettingsForms";
 
 const mockMutate = jest.fn();
 jest.mock("@/api/queries", () => ({
   useUpdateProfile: () => ({ mutate: mockMutate, isPending: false }),
+  useUpdatePrefs: () => ({ mutate: mockMutate, isPending: false }),
 }));
-jest.mock("@/lib/push", () => ({ pushSupported: () => false, enablePush: jest.fn(), disablePush: jest.fn() }));
+jest.mock("@/lib/push", () => ({ pushSupported: () => false, pushUnavailableReason: () => "Push unavailable", enablePush: jest.fn(), disablePush: jest.fn() }));
 jest.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ adoptSession: jest.fn() }) }));
 
 const prefs = notificationPrefsSchema.parse({
@@ -31,6 +32,21 @@ const user: Me["user"] = {
 };
 
 beforeEach(() => mockMutate.mockReset());
+
+describe("price update notification preferences", () => {
+  it.each(["FARMER", "TRADER", "ADMIN"] as const)("shows and saves the price-update switch for %s", async (role) => {
+    await render(<NotificationPrefsForm prefs={prefs} role={role} />);
+    const toggle = screen.getByRole("switch", { name: "Актуализации на цените" });
+    expect(toggle.props.value).toBe(true);
+    await fireEvent(toggle, "valueChange", false);
+    expect(mockMutate).toHaveBeenCalledWith({ priceMove: false }, expect.any(Object));
+  });
+
+  it("disables price notifications when the global setting is off", async () => {
+    await render(<NotificationPrefsForm prefs={{ ...prefs, enabled: false }} role="ADMIN" />);
+    expect(screen.getByRole("switch", { name: "Актуализации на цените" }).props.disabled).toBe(true);
+  });
+});
 
 describe("settings helpers", () => {
   it("builds initials from the first and last name", () => {

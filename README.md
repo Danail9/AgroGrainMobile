@@ -48,8 +48,22 @@ running `expo start` on port 3000, which fails when that PC has virtual network 
 
 ### Accounts
 
+Market and home crop prices are manually entered Varna/Burgas port quotes only.
+Lists retain compact crop-icon rows with separate Varna and Burgas price columns;
+missing quotes show a dash. Details show full delivery labels and update dates.
+Crop details include a local quantity calculator below the port quotes, initially
+set to 100 tonnes. It accepts decimal commas or dots and estimates the euro value
+at each published port price, plus the absolute difference when both exist.
+Whole-euro totals omit decimal zeros (for example, `20 400 €`); cents remain visible.
+Missing quotes never count as zero. Estimates are not profit calculations and
+do not subtract transport costs; no additional API request is needed.
+Crops without quotes are
+omitted. There are no scraped/national crop prices, price charts, comparison
+controls, or target-price alerts. This requires the updated web API and mobile
+client. Existing manual port quotes are preserved by the server migration.
+
 The account needs an **active subscription** (admin-granted, or the platform "free access"
-setting) and the demo seed account is `demo@agrograin.bg` / `demo1234`. Without a plan the app
+setting). Register your own account; database seeding does not create a demo login. Without a plan the app
 shows a text-only gate, by design (see below).
 
 ### If `expo start` crashes when the phone connects
@@ -98,9 +112,17 @@ src/theme/      colour, spacing and type tokens from the portal's globals.css
 - **One phone per account.** The portal allows one browser session and one phone session. A
   second phone is refused until the first signs out or an admin approves it.
 - **Offline.** Reads come from a cache kept for 7 days and are labelled "обновено преди …".
-  Changes need a connection.
-- The News screen shows the latest USDA WASDE global wheat, corn, and soybean estimates in
-  Bulgarian, with a link to the readable PDF report. These are world supply-and-demand
-  balances, not Bulgarian prices; the portal reads USDA's public monthly XML.
+  Changes need a connection. The manual-port-prices cache revision discards older
+  national-price responses, including after same-version OTA updates.
+- The News screen shows the latest USDA WASDE global wheat, corn, rice and soybean estimates
+  in Bulgarian, with a link to the readable PDF report. Each crop shows production, ending
+  stocks and stocks-to-use with the change versus the previous season, a deterministic
+  "balance" chip (tighter / looser / no clear direction) derived server-side from the monthly
+  stocks revision and the change in cover, plus expandable details: consumption, trade,
+  monthly revisions, the regions that matter for Bulgaria (EU, Russia, Ukraine, US, Brazil,
+  Argentina) and a short "why it matters" note. The header shows the publication date and the
+  next USDA release date when the portal could read the calendar. These are world
+  supply-and-demand balances, not Bulgarian prices; the portal reads USDA's public monthly
+  XML. Summaries cached by older app versions still parse because the new fields default.
 - Expo APIs change every SDK. Check `https://docs.expo.dev/versions/v57.0.0/` before using one
   from memory, and use `npx expo install` (not `npm install`) for Expo packages.

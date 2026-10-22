@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { Text } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import type { PriceRow } from "@/api/schemas";
 import {
@@ -13,6 +14,15 @@ import {
 } from "@/lib/trade";
 import { DismissibleHint } from "@/ui/DismissibleHint";
 import { Tabs } from "@/ui/Tabs";
+import { OfferForm } from "@/ui/TradeForms";
+
+let mockPortPrices: PriceRow[] = [];
+jest.mock("@/api/queries", () => ({
+  useMarket: () => ({ data: { prices: mockPortPrices } }),
+  useMe: () => ({ data: { favoriteCrops: ["wheat"] } }),
+  useCreateOffer: () => ({ mutate: jest.fn(), isPending: false }),
+  useCreateListing: () => ({ mutate: jest.fn(), isPending: false }),
+}));
 
 const NOW = new Date(2026, 9, 9, 10, 0).getTime();
 const DAY = 86_400_000;
@@ -24,6 +34,30 @@ describe("trade helpers", () => {
     expect(formatPrice(700, "€/т")).toBe("700 €/т");
     expect(formatPrice(12.5, "€/кг")).toBe("12,50 €/кг");
     expect(formatPrice(1250)).toBe("1250");
+  });
+
+  it("offers explicit port-price fills without a misleading generic market comparison", async () => {
+    mockPortPrices = [{
+      ...row("Пшеница", 205), slug: "wheat", category: "GRAIN", portPrices: [
+        { destination: "VARNA", label: "Доставено до пристанище Варна", price: 205, date: "2026-10-20" },
+        { destination: "BURGAS", label: "Доставено до пристанище Бургас", price: 210.5, date: "2026-10-20" },
+      ],
+    }];
+    await render(
+      <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>
+        <OfferForm crops={[{ slug: "wheat", name: "Пшеница" }]} fertilizers={[]} />
+      </SafeAreaProvider>,
+    );
+    await fireEvent.press(screen.getByLabelText("Избери Пшеница"));
+    expect(screen.getByText("205,00 €/т")).toBeTruthy();
+    expect(screen.getByText("210,50 €/т")).toBeTruthy();
+    expect(screen.queryByText(/Пазарна цена днес/)).toBeNull();
+    await fireEvent.press(screen.getByText("Използвай Бургас"));
+    expect(screen.getByLabelText("Цена").props.value).toBe("210.5");
+    expect(screen.queryByText(/над пазара|под пазара|Колкото пазара/)).toBeNull();
+    await fireEvent.changeText(screen.getByLabelText("Мярка"), "€/кг");
+    expect(screen.queryByText("Използвай Варна")).toBeNull();
+    expect(screen.queryByText("Използвай Бургас")).toBeNull();
   });
 
   it("matches an offer to its market row by name, ignoring case and spaces", () => {
@@ -39,6 +73,16 @@ describe("trade helpers", () => {
     expect(marketDelta(250, "€/кг", row("x", 200))).toBeNull();
     expect(marketDelta(null, "€/т", row("x", 200))).toBeNull();
     expect(marketDelta(250, "€/т", null)).toBeNull();
+  });
+
+  it("does not compare a trade price against an unspecified port's delivered quote", () => {
+    const delivered: PriceRow = {
+      ...row("Пшеница", 205), delivery: "VARNA", portPrices: [
+        { destination: "VARNA", label: "Доставено до пристанище Варна", price: 205, date: new Date(NOW).toISOString() },
+      ],
+    };
+    expect(marketDelta(250, "€/т", delivered)).toBeNull();
+    expect(marketDelta(250, "€/т", { ...delivered, portPrices: undefined })).toBeNull();
   });
 
   it("words the expiry and warns in the last three days", () => {

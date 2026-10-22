@@ -30,7 +30,9 @@ describe("notification settings", () => {
     expect(!!screen.queryByLabelText("Нови оферти в Борса")).toBe(role === "FARMER");
     expect(!!screen.queryByLabelText("Нови обяви в Борса")).toBe(role === "TRADER");
     expect(!!screen.queryByText("Борса")).toBe(role !== "ADMIN");
-    expect(screen.getByLabelText("Промяна в цените")).toBeTruthy();
+    expect(screen.queryByLabelText("Промяна в цените")).toBeNull();
+    expect(screen.queryByText("Праг на промяната")).toBeNull();
+    expect(screen.queryByLabelText("Целева цена")).toBeNull();
   });
   it.each([
     ["Всички известия", "enabled"],
@@ -38,7 +40,6 @@ describe("notification settings", () => {
     ["Нови обяви в Борса", "newListing"],
     ["Надграждане на абонамента", "subscriptionUpgrade"],
     ["Напомняне за абонамента", "subscriptionReminder"],
-    ["Промяна в цените", "priceMove"],
     ["Очаквани валежи", "heavyRain"],
     ["Ниски температури", "frost"],
     ["Силен вятър", "strongWind"],

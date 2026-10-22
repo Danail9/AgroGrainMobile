@@ -8,8 +8,8 @@
  *      response against the schemas the app ships with.
  *
  * Usage:
- *   API_URL=http://localhost:3000 CHECK_EMAIL=demo@agrograin.bg \
- *   CHECK_PASSWORD=demo1234 npm run check:contract
+ *   API_URL=http://localhost:3000 CHECK_EMAIL=your-account@example.com \
+ *   CHECK_PASSWORD=your-password npm run check:contract
  *
  * Use an account with an active plan that can trade (a TRADER plan), or the
  * trade endpoints will be reported as skipped. Exit code 1 on any mismatch.

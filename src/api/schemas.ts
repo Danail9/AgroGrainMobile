@@ -306,6 +306,14 @@ export const priceRowSchema = z.object({
   date: isoDate,
   source: z.string().nullish(),
   overridden: z.boolean().nullish(),
+  delivery: z.enum(["NATIONAL", "VARNA", "BURGAS"]).optional(),
+  deliveryLabel: z.string().optional(),
+  portPrices: z.array(z.object({
+    destination: z.enum(["VARNA", "BURGAS"]),
+    label: z.string(),
+    price: z.number().positive(),
+    date: isoDate,
+  })).optional(),
 });
 
 export const fertilizerSchema = z.object({
@@ -389,6 +397,19 @@ export const weeklyBriefingSchema = z.object({
   periodEnd: isoDate,
 });
 
+export const wasdeRegionSchema = z.object({
+  name: z.string(),
+  production: z.number().nullable(),
+  exports: z.number().nullable(),
+  imports: z.number().nullable(),
+  endingStocks: z.number().nullable(),
+  productionChange: z.number().nullable(),
+  exportsChange: z.number().nullable(),
+  previousYearProduction: z.number().nullable(),
+  previousYearExports: z.number().nullable(),
+});
+
+/** Newer fields default so summaries cached by older app versions still parse. */
 export const wasdeSummarySchema = z.object({
   reportMonth: z.string(),
   sourceUrl: z.url(),
@@ -400,10 +421,28 @@ export const wasdeSummarySchema = z.object({
     marketYear: z.string(),
     production: z.number().nullable(),
     totalUse: z.number().nullable(),
+    trade: z.number().nullable().default(null),
+    tradeLabel: z.enum(["Търговия", "Износ"]).default("Износ"),
     endingStocks: z.number().nullable(),
     productionChange: z.number().nullable(),
+    totalUseChange: z.number().nullable().default(null),
+    tradeChange: z.number().nullable().default(null),
     endingStocksChange: z.number().nullable(),
+    stocksToUse: z.number().nullable().default(null),
+    previousYear: z.object({
+      marketYear: z.string(),
+      production: z.number().nullable(),
+      totalUse: z.number().nullable(),
+      trade: z.number().nullable(),
+      endingStocks: z.number().nullable(),
+      stocksToUse: z.number().nullable(),
+    }).nullable().default(null),
+    signal: z.enum(["looser", "tighter", "steady"]).nullable().default(null),
+    regions: z.array(wasdeRegionSchema).default([]),
+    context: z.string().default(""),
   })),
+  releaseDate: z.string().nullable().default(null),
+  nextReleaseDate: z.string().nullable().default(null),
 });
 
 export const chatReplySchema = z.object({

@@ -99,7 +99,7 @@ export function BriefingView({
       ) : null}
 
       <View style={{ flexDirection: "row", gap: 8 }}>
-        <NavCard title="Пазарен анализ" icon="stats-chart" tone="brand" href="/ai/market" />
+        <NavCard title="Пазарен обзор" icon="stats-chart" tone="brand" href="/ai/market" />
         <NavCard title="Анализ на времето" icon="partly-sunny" tone="sky" href="/ai/weather" />
       </View>
     </View>

@@ -36,6 +36,7 @@ import {
   weatherResponseSchema,
   wasdeSummarySchema,
   weeklyBriefingSchema,
+  type PriceRow,
 } from "@/api/schemas";
 
 const MINUTE = 60_000;
@@ -155,9 +156,9 @@ export const useInvoices = () =>
   });
 
 /** The model-written commentary is slow, so it loads after the rest of the screen. */
-export const useCropInsight = (slug: string) =>
+export const useCropInsight = (slug: string, delivery: PriceRow["delivery"] = "NATIONAL") =>
   useQuery({
-    queryKey: keys.cropInsight(slug),
+    queryKey: [...keys.cropInsight(slug), delivery],
     queryFn: ({ signal }) =>
       api(`/market/${encodeURIComponent(slug)}/insight`, { schema: cropInsightSchema, signal }),
     staleTime: untilMidnight(),

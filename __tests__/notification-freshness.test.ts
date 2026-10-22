@@ -1,14 +1,40 @@
-import { QueryClient, QueryObserver, onlineManager } from "@tanstack/react-query";
+import { QueryClient, QueryObserver, dehydrate, onlineManager } from "@tanstack/react-query";
+import { persistQueryClientRestore } from "@tanstack/react-query-persist-client";
 import { AppState } from "react-native";
 
 import { keys } from "@/api/queries";
-import { NOTIFICATION_REFRESH_INTERVAL, watchNotificationFreshness } from "@/api/queryClient";
+import { NOTIFICATION_REFRESH_INTERVAL, persistOptions, watchNotificationFreshness } from "@/api/queryClient";
+import { APP_VERSION } from "@/config";
 
 afterEach(() => {
   jest.restoreAllMocks();
   jest.clearAllMocks();
 });
 
+it("discards cached national prices after a same-version OTA update, but restores new quote data", async () => {
+  const source = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
+  const target = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
+  source.setQueryData(keys.market, { prices: [{ price: 195 }] });
+  const restoreClient = jest.fn().mockResolvedValue({
+    timestamp: Date.now(), buster: APP_VERSION, clientState: dehydrate(source),
+  });
+  const removeClient = jest.fn();
+  const persister = { restoreClient, removeClient, persistClient: jest.fn() };
+  await persistQueryClientRestore({ ...persistOptions, queryClient: target, persister });
+  expect(removeClient).toHaveBeenCalledTimes(1);
+  expect(target.getQueryData(keys.market)).toBeUndefined();
+
+  const manualPrices = { prices: [{ portPrices: [{ destination: "VARNA", price: 205 }] }] };
+  source.setQueryData(keys.market, manualPrices);
+  restoreClient.mockResolvedValue({
+    timestamp: Date.now(), buster: persistOptions.buster, clientState: dehydrate(source),
+  });
+  await persistQueryClientRestore({ ...persistOptions, queryClient: target, persister });
+  expect(removeClient).toHaveBeenCalledTimes(1);
+  expect(target.getQueryData(keys.market)).toEqual(manualPrices);
+  source.clear();
+  target.clear();
+});
 it("checks every 10 seconds only while foregrounded and online, and stops on cleanup", async () => {
   jest.useFakeTimers();
   const client = new QueryClient();

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import type { z } from "zod";
 
@@ -92,6 +92,13 @@ export function WeatherStats({
     ...months.flatMap((month) => [month.current.precipitation, month.previous.precipitation]),
     1,
   );
+  const currentRain = months.reduce((sum, month) => sum + month.current.precipitation, 0);
+  const previousRain = months.reduce((sum, month) => sum + month.previous.precipitation, 0);
+  const rainfallChange = currentRain - previousRain;
+  const rainfallChangePct = previousRain > 0 ? (rainfallChange / previousRain) * 100 : null;
+  const monthRange = months.length
+    ? `януари – ${monthName(months[months.length - 1].month - 1)}`
+    : "";
 
   const show = (value: number | null, digits: number, unit: string) =>
     value === null ? "–" : `${formatNumber(value, digits)}${unit}`;
@@ -168,28 +175,95 @@ export function WeatherStats({
       {months.length ? (
         <Card style={{ gap: 12 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <AppText variant="small" bold>
-              Валежи по месеци
-            </AppText>
+            <View style={{ flex: 1, gap: 2 }}>
+              <AppText variant="small" bold>Валежи по месеци</AppText>
+              <AppText variant="caption" tone="muted">Сравнение за {monthRange}</AppText>
+            </View>
             <View style={{ flexDirection: "row", gap: 12 }}>
               <Legend color={colors.brand[600]} label={String(active.current.year)} />
               <Legend color={PREVIOUS_BAR} label={String(active.previous.year)} />
             </View>
           </View>
 
-          {months.map((month) => (
-            <View key={month.month} style={{ gap: 4 }}>
-              <AppText variant="caption" tone="muted" bold>
-                {monthName(month.month - 1)}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              padding: 12,
+              borderRadius: radius.md,
+              backgroundColor: colors.soft,
+            }}
+          >
+            <View style={{ flex: 1, gap: 3 }}>
+              <AppText variant="caption" tone="muted">{active.current.year} · натрупани валежи</AppText>
+              <AppText variant="body" bold numeric>
+                {formatNumber(currentRain)} mm
               </AppText>
-              <Bar
-                value={month.current.precipitation}
-                max={maxMonthly}
-                color={colors.brand[600]}
-              />
+            </View>
+            <View style={{ alignItems: "flex-end", gap: 3 }}>
+              <AppText variant="caption" tone="muted">{active.previous.year}</AppText>
+              <AppText variant="small" bold numeric>
+                {formatNumber(previousRain)} mm
+              </AppText>
+            </View>
+            <View style={{ alignItems: "flex-end", gap: 3, minWidth: 72 }}>
+              <AppText variant="caption" tone="muted">Разлика</AppText>
+              <AppText
+                variant="small"
+                bold
+                numeric
+                style={{
+                  color: rainfallChange > 0
+                    ? colors.up
+                    : rainfallChange < 0
+                      ? colors.down
+                      : colors.muted,
+                }}
+              >
+                {`${rainfallChange > 0 ? "+" : rainfallChange < 0 ? "−" : ""}${formatNumber(Math.abs(rainfallChange))} mm`}
+              </AppText>
+              {rainfallChangePct !== null ? (
+                <AppText
+                  variant="caption"
+                  numeric
+                  style={{
+                    color: rainfallChange > 0
+                      ? colors.up
+                      : rainfallChange < 0
+                        ? colors.down
+                        : colors.muted,
+                  }}
+                >
+                  {`${rainfallChangePct > 0 ? "+" : ""}${formatNumber(rainfallChangePct, 0)}%`}
+                </AppText>
+              ) : null}
+            </View>
+          </View>
+
+          {months.map((month) => (
+            <View
+              key={month.month}
+              style={{
+                gap: 5,
+                paddingVertical: 8,
+                borderBottomWidth: StyleSheet.hairlineWidth,
+                borderBottomColor: colors.line,
+              }}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <AppText variant="caption" tone="muted" bold>
+                  {monthName(month.month - 1)}
+                </AppText>
+                <MonthChange current={month.current.precipitation} previous={month.previous.precipitation} />
+              </View>
+              <Bar value={month.current.precipitation} max={maxMonthly} color={colors.brand[600]} />
               <Bar value={month.previous.precipitation} max={maxMonthly} color={PREVIOUS_BAR} />
             </View>
           ))}
+          <AppText variant="caption" tone="muted">
+            {`Общо за периода: ${formatNumber(currentRain)} mm през ${active.current.year} срещу ${formatNumber(previousRain)} mm през ${active.previous.year}.`}
+          </AppText>
         </Card>
       ) : null}
     </View>
@@ -224,5 +298,21 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
         {formatNumber(value)} mm
       </AppText>
     </View>
+  );
+}
+
+function MonthChange({ current, previous }: { current: number; previous: number }) {
+  const difference = current - previous;
+  const color = difference > 0 ? colors.up : difference < 0 ? colors.down : colors.muted;
+  const text = difference > 0
+    ? `↑ ${formatNumber(difference)} mm`
+    : difference < 0
+      ? `↓ ${formatNumber(Math.abs(difference))} mm`
+      : "без промяна";
+
+  return (
+    <AppText variant="caption" numeric bold style={{ color }}>
+      {text}
+    </AppText>
   );
 }

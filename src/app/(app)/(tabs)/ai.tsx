@@ -1,10 +1,9 @@
 import { router, type Href } from "expo-router";
 import { Pressable, View } from "react-native";
 
-import { useMarket, useMe, useWeather } from "@/api/queries";
+import { useMe, useWeather } from "@/api/queries";
 import { SUGGESTIONS } from "@/lib/ai";
-import { formatHour, formatNumber, monthName } from "@/lib/format";
-import { strongestSignal } from "@/lib/market";
+import { formatHour, monthName } from "@/lib/format";
 import { colors, radius, space } from "@/theme/tokens";
 import { Icon, type IconName } from "@/ui/Icon";
 import { Card, IconTile, LinkRow, pressedStyle, tileColor } from "@/ui/primitives";
@@ -21,13 +20,10 @@ const SHORTCUTS: { href: Href; label: string; icon: IconName }[] = [
 export default function AiScreen() {
   const me = useMe();
   const weather = useWeather();
-  const market = useMarket();
 
   const today = weather.data?.fieldWork[0];
   const spray = weather.data?.sprayWindow;
   const nextGood = weather.data?.fieldWork.slice(1).find((day) => day.level === "good");
-  const signal = market.data ? strongestSignal(market.data.prices) : undefined;
-  const firstPrice = market.data?.prices[0];
   const regionName = me.data?.user.regionName;
 
   return (
@@ -123,13 +119,10 @@ export default function AiScreen() {
             </IconTile>
             <View style={{ flex: 1 }}>
               <AppText variant="small" bold numberOfLines={1}>
-                {signal?.name ?? firstPrice?.name ?? "Пазар"}{" "}
-                {signal && signal.changePct !== null
-                  ? `${signal.changePct >= 0 ? "+" : ""}${signal.changePct.toFixed(1)}%`
-                  : ""}
+                Пазарен обзор
               </AppText>
               <AppText variant="caption" tone="muted" numberOfLines={2}>
-                {signal ? `${formatNumber(signal.price)} ${signal.unit}` : "Виж пазарния анализ"}
+                Оферти за Варна и Бургас
               </AppText>
             </View>
           </Card>

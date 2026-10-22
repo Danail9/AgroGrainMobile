@@ -9,6 +9,7 @@ import { colors, radius, space } from "@/theme/tokens";
 import { CatalogPicker, OTHER } from "@/ui/CatalogPicker";
 import { Button, ChoiceGroup, FormMessage, TextField } from "@/ui/forms";
 import { Icon } from "@/ui/Icon";
+import { PortPriceQuotes } from "@/ui/PortPriceQuotes";
 import { pressedStyle } from "@/ui/primitives";
 import { AppText } from "@/ui/Text";
 
@@ -429,7 +430,7 @@ function PriceRow({
   );
 }
 
-/** Today's market price for the chosen crop, how the typed price compares, and a one-tap fill. */
+/** Current quotes for the chosen crop, with delivery-specific one-tap fills. */
 function MarketHint({
   title,
   price,
@@ -445,6 +446,23 @@ function MarketHint({
 }) {
   const row = title ? findMarketRow(title, prices) : null;
   if (!row) return null;
+
+  if (row.portPrices) {
+    return (
+      <View style={[styles.hint, { flexDirection: "column", alignItems: "stretch" }]}>
+        <PortPriceQuotes price={row} />
+        {row.unit === unit ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm }}>
+            {row.portPrices.filter((quote) => String(quote.price) !== normalizeDecimal(price)).map((quote) => (
+              <Button key={quote.destination} compact variant="secondary"
+                title={`Използвай ${quote.destination === "VARNA" ? "Варна" : "Бургас"}`}
+                onPress={() => onUse(String(quote.price))} />
+            ))}
+          </View>
+        ) : null}
+      </View>
+    );
+  }
 
   const typed = Number(normalizeDecimal(price));
   const delta = price.trim() && Number.isFinite(typed) ? marketDelta(typed, unit, row) : null;

@@ -19,8 +19,8 @@ jest.mock("@/api/queries", () => ({
 jest.mock("@/ui/Screen", () => {
   const { Button, Text } = require("react-native");
   return {
-    Screen: ({ refreshing, onRefresh }: { refreshing: boolean; onRefresh: () => void }) => (
-      <><Text testID="refreshing">{String(refreshing)}</Text><Button title="Refresh" onPress={onRefresh} /></>
+    Screen: ({ refreshing, onRefresh, right }: { refreshing: boolean; onRefresh: () => void; right: ReactNode }) => (
+      <>{right}<Text testID="refreshing">{String(refreshing)}</Text><Button title="Refresh" onPress={onRefresh} /></>
     ),
   };
 });
@@ -32,6 +32,13 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockFetching = true;
   mockRefetch.mockResolvedValue({});
+});
+
+it("keeps notifications and profile shortcuts without a news icon in the home header", async () => {
+  await render(<HomeScreen />);
+  expect(screen.queryByRole("button", { name: "Новини" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Известия" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Профил" })).toBeTruthy();
 });
 
 it("does not show the pull spinner for background requests or returning to Home", async () => {

@@ -4,7 +4,7 @@ import { Pressable, View } from "react-native";
 
 import { useMarket, useMe } from "@/api/queries";
 import type { PriceRow as PriceRowData } from "@/api/schemas";
-import { formatNumber, formatShortDate, relativeTime } from "@/lib/format";
+import { formatShortDate, relativeTime } from "@/lib/format";
 import { colors, radius, space } from "@/theme/tokens";
 import { FertilizerMarket } from "@/ui/FertilizerMarket";
 import { Icon, type IconName } from "@/ui/Icon";
@@ -42,7 +42,7 @@ export default function MarketScreen() {
       tabbed
       back="/"
       title="Пазар"
-      subtitle={me.data ? `Актуални изкупни цени · ${me.data.user.regionName}` : undefined}
+      subtitle="Доставено до пристанище Варна/Бургас"
       onRefresh={() => void market.refetch()}
       refreshing={market.isRefetching}
     >
@@ -145,10 +145,10 @@ function Grain({ data, favorites }: { data: Market; favorites: string[] }) {
                 <Icon name="stats-chart" size={26} color={colors.brand[600]} />
                 <View style={{ flex: 1 }}>
                   <AppText variant="body" bold>
-                    AgroGrain AI анализ
+                    Пазарен обзор
                   </AppText>
                   <AppText variant="caption" tone="muted">
-                    Кратък пазарен анализ и основни фактори.
+                    Текущи пристанищни оферти и пазарни новини.
                   </AppText>
                 </View>
                 <Icon name="chevron-forward" size={18} color={colors.muted} />
@@ -165,7 +165,7 @@ function Grain({ data, favorites }: { data: Market; favorites: string[] }) {
 
 function PriceList({ prices, favorites }: { prices: PriceRowData[]; favorites: string[] }) {
   if (!prices.length) {
-    return <EmptyState title="Няма данни" description="Няма данни за тази категория." />;
+    return <EmptyState title="Няма оферти" description="Все още няма публикувани пристанищни оферти в тази категория." />;
   }
   const showChange = prices.some((price) => price.changePct !== null);
   return (
@@ -183,37 +183,19 @@ function PriceList({ prices, favorites }: { prices: PriceRowData[]; favorites: s
 function MarketPulse({ prices }: { prices: PriceRowData[] }) {
   if (!prices.length) return null;
 
-  const sorted = [...prices].sort((a, b) => b.price - a.price);
-  const highest = sorted[0];
-  const lowest = sorted[sorted.length - 1] ?? highest;
-  const average = Math.round(prices.reduce((total, price) => total + price.price, 0) / prices.length);
   const latest = new Date(Math.max(...prices.map((price) => new Date(price.date).getTime())));
 
   return (
     <View style={{ gap: space.md }}>
       <View>
-        <AppText variant="heading">Пазарен пулс</AppText>
+        <AppText variant="heading">Публикувани оферти</AppText>
         <AppText variant="caption" tone="muted">
-          Бърз поглед върху избраната категория.
+          Цените се въвеждат ръчно. Товаренето на кораб се договаря отделно.
         </AppText>
       </View>
       <View style={{ flexDirection: "row", gap: 12 }}>
-        <Tile label="Средна цена" value={`${formatNumber(average)} €/т`} />
+        <Tile label="Пристанищни оферти" value={String(prices.reduce((sum, row) => sum + (row.portPrices?.length ?? 0), 0))} />
         <Tile label="Обновено" value={formatShortDate(latest)} />
-      </View>
-      <View style={{ flexDirection: "row", gap: 12 }}>
-        <Tile
-          label="Най-висока"
-          value={highest.name}
-          note={`${formatNumber(highest.price)} ${highest.unit}`}
-          onPress={() => router.push(`/market/${highest.slug}`)}
-        />
-        <Tile
-          label="Най-ниска"
-          value={lowest.name}
-          note={`${formatNumber(lowest.price)} ${lowest.unit}`}
-          onPress={() => router.push(`/market/${lowest.slug}`)}
-        />
       </View>
     </View>
   );

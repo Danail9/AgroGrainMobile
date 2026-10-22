@@ -44,8 +44,8 @@ export const persister = createAsyncStoragePersister({
 export const persistOptions = {
   persister,
   maxAge: CACHE_MAX_AGE,
-  // A new app version may change response shapes; never hydrate the old ones.
-  buster: APP_VERSION,
+  // Invalidate national prices even for OTA updates within the same app version.
+  buster: `${APP_VERSION}:manual-port-prices-v1`,
   dehydrateOptions: {
     shouldDehydrateQuery: (query: Query) =>
       query.meta?.persist !== false && defaultShouldDehydrateQuery(query),

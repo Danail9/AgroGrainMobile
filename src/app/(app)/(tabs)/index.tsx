@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { keys, useHome, useMarket, useMe, useNotifications, useTrade, useWeather } from "@/api/queries";
 import type { Home, WeatherResponse } from "@/api/schemas";
 import { formatLongDate, formatNumber, greeting, relativeTime, updatedAgo } from "@/lib/format";
-import { expiringSoon, expiryOf, findMarketRow, formatPrice, marketDelta, topMovers } from "@/lib/trade";
+import { expiringSoon, expiryOf, findMarketRow, formatPrice, marketDelta } from "@/lib/trade";
 import { colors, radius, shadowCard, space } from "@/theme/tokens";
 import { BriefingSections } from "@/ui/BriefingSections";
 import { HeaderActions } from "@/ui/HeaderActions";
@@ -78,7 +78,7 @@ export default function HomeScreen() {
       title={salutation}
       wrapTitle
       subtitle={trader && home.dataUpdatedAt ? `${formatLongDate()} · ${updatedAgo(home.dataUpdatedAt).replace("обновено ", "обн. ").replace(/минути?/, "мин")}` : formatLongDate()}
-      right={<HeaderActions unreadCount={unread} news={!trader} />}
+      right={<HeaderActions unreadCount={unread} />}
       onRefresh={() => void refreshHome()}
       refreshing={refreshing}
     >
@@ -361,7 +361,6 @@ function TraderView({ data, favorites, now }: { data: TraderHome; favorites: str
   const prices = homePrices(data.prices, market.data?.prices, favorites);
   const showChange = prices.some((price) => price.changePct !== null && price.changePct !== 0);
   const expiring = expiringSoon(trade.data?.myOffers ?? [], now);
-  const movers = topMovers(market.data?.prices);
 
   return (
     <>
@@ -410,7 +409,7 @@ function TraderView({ data, favorites, now }: { data: TraderHome; favorites: str
 
       <View style={{ flexDirection: "row", gap: 8 }}>
         <QuickAction icon="add-circle" label="Нова оферта" onPress={() => router.push("/trade?tab=offers")} />
-        <QuickAction icon="sparkles" label="AI анализ" onPress={() => router.push("/ai/market")} />
+        <QuickAction icon="stats-chart" label="Пазарен обзор" onPress={() => router.push("/ai/market")} />
         <QuickAction icon="calculator" label="Калкулатор" onPress={() => router.push("/ai/calculator")} />
       </View>
 
@@ -477,44 +476,6 @@ function TraderView({ data, favorites, now }: { data: TraderHome; favorites: str
           </Card>
         )}
       </View>
-
-      {movers.length ? (
-        <View>
-          <SectionHeader title="Движение днес" action="AI анализ" href="/ai/market" />
-          <RowList>
-            {movers.map((row, index) => {
-              const up = (row.changePct ?? 0) > 0;
-              return (
-                <View key={row.slug}>
-                  {index > 0 ? <Divider /> : null}
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => router.push(`/market/${row.slug}`)}
-                    style={({ pressed }) => [styles.mover, pressed && pressedStyle]}
-                  >
-                    <View style={[styles.trend, { backgroundColor: up ? colors.brand[50] : colors.red50 }]}>
-                      <Icon name={up ? "trending-up" : "trending-down"} size={18} color={up ? colors.up : colors.down} />
-                    </View>
-                    <AppText variant="small" bold numberOfLines={1} style={{ flex: 1 }}>
-                      {row.emoji ? `${row.emoji} ` : ""}
-                      {row.name}
-                    </AppText>
-                    <View style={{ alignItems: "flex-end" }}>
-                      <AppText variant="small" bold numeric>
-                        {formatPrice(row.price, row.unit)}
-                      </AppText>
-                      <AppText variant="caption" bold numeric style={{ color: up ? colors.up : colors.down }}>
-                        {up ? "+" : "−"}
-                        {formatNumber(Math.abs(row.changePct ?? 0), 1)}%
-                      </AppText>
-                    </View>
-                  </Pressable>
-                </View>
-              );
-            })}
-          </RowList>
-        </View>
-      ) : null}
 
       <View>
         <SectionHeader title="Пазарни цени" action="Виж всички" href="/market" />
@@ -650,6 +611,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  mover: { flexDirection: "row", alignItems: "center", gap: space.md, paddingHorizontal: space.lg, paddingVertical: 12 },
-  trend: { width: 32, height: 32, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
 });
