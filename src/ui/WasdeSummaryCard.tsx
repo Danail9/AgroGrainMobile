@@ -45,8 +45,14 @@ export function percentChange(current: number | null, previous: number | null | 
     : null;
 }
 
+const UNIT = "млн. т";
+
 function amount(value: number | null, fractionDigits = 2) {
-  return value === null ? "—" : formatNumber(value, fractionDigits);
+  return value === null ? "—" : `${formatNumber(value, fractionDigits)} ${UNIT}`;
+}
+
+function revision(value: number | null) {
+  return value === null ? "—" : value === 0 ? "без промяна" : `${signed(value)} ${UNIT}`;
 }
 
 function signed(value: number | null, suffix = "", fractionDigits = suffix === "%" ? 1 : 2) {
@@ -112,7 +118,7 @@ export function WasdeSummaryCard({
             Доклад за {summary.reportMonth}
             {summary.releaseDate ? ` · публикуван на ${formatWasdeDate(summary.releaseDate)}` : ""}
           </AppText>
-          <AppText variant="caption" tone="muted">Количествата са в млн. метрични тона</AppText>
+          <AppText variant="caption" tone="muted">Всички количества са в млн. т (1 млн. т = 1 000 000 тона)</AppText>
         </View>
         <View style={styles.globalBadge}>
           <AppText variant="caption" tone="brand" bold>Световни оценки</AppText>
@@ -183,10 +189,14 @@ function EstimateBlock({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  // Persisted summaries from older builds bypass the schema defaults, so guard every new field.
   const signal = estimate.signal ? SIGNALS[estimate.signal] : null;
-  const previous = estimate.previousYear;
-  const coverDelta = estimate.stocksToUse !== null && previous?.stocksToUse != null
-    ? Math.round((estimate.stocksToUse - previous.stocksToUse) * 10) / 10
+  const previous = estimate.previousYear ?? null;
+  const regions = estimate.regions ?? [];
+  const context = estimate.context ?? "";
+  const stocksToUse = estimate.stocksToUse ?? null;
+  const coverDelta = stocksToUse !== null && previous?.stocksToUse != null
+    ? Math.round((stocksToUse - previous.stocksToUse) * 10) / 10
     : null;
 
   return (
@@ -211,7 +221,7 @@ function EstimateBlock({
         <Metric label="Крайни запаси" value={amount(estimate.endingStocks)}
           note={previous ? `${signed(percentChange(estimate.endingStocks, previous.endingStocks), "%")} г/г` : null} />
         <Metric label="Запаси/потребление"
-          value={estimate.stocksToUse === null ? "—" : `${formatNumber(estimate.stocksToUse, 1)}%`}
+          value={stocksToUse === null ? "—" : `${formatNumber(stocksToUse, 1)}%`}
           note={coverDelta === null ? null : `${signed(coverDelta, "", 1)} п. г/г`} />
       </View>
 
@@ -236,26 +246,26 @@ function EstimateBlock({
             <DetailMetric label={estimate.tradeLabel} value={amount(estimate.trade)} />
             <DetailMetric
               label={`Ревизия на производството${comparisonMonth ? ` спрямо ${comparisonMonth}` : ""}`}
-              value={comparisonMonth ? signed(estimate.productionChange) : "—"}
+              value={comparisonMonth ? revision(estimate.productionChange) : "—"}
             />
             <DetailMetric
               label={`Ревизия на запасите${comparisonMonth ? ` спрямо ${comparisonMonth}` : ""}`}
-              value={comparisonMonth ? signed(estimate.endingStocksChange) : "—"}
+              value={comparisonMonth ? revision(estimate.endingStocksChange) : "—"}
             />
           </View>
 
-          {estimate.regions.length ? (
+          {regions.length ? (
             <View style={{ gap: space.xs }}>
               <AppText variant="caption" bold>Ключови региони за България</AppText>
-              {estimate.regions.map((region) => (
+              {regions.map((region) => (
                 <RegionRow key={region.name} region={region} previousYear={previous?.marketYear ?? null} />
               ))}
             </View>
           ) : null}
 
-          {estimate.context ? (
+          {context ? (
             <AppText variant="caption" tone="muted" style={{ lineHeight: 18 }}>
-              <AppText variant="caption" bold>Защо е важно: </AppText>{estimate.context}
+              <AppText variant="caption" bold>Защо е важно: </AppText>{context}
             </AppText>
           ) : null}
         </View>
@@ -276,7 +286,7 @@ function RegionRow({ region, previousYear }: { region: Region; previousYear: str
           <AppText variant="caption" numeric bold>{amount(region.production)}</AppText>
           <AppText variant="caption" tone="muted">
             {`${signed(productionYoY, "%")} спрямо ${previousYear ?? "миналия сезон"}`}
-            {region.productionChange !== null && region.productionChange !== 0 ? ` · ${signed(region.productionChange)} за месеца` : ""}
+            {region.productionChange !== null && region.productionChange !== 0 ? ` · ${signed(region.productionChange)} ${UNIT} за месеца` : ""}
           </AppText>
         </View>
         <View style={{ flex: 1 }}>
@@ -284,7 +294,7 @@ function RegionRow({ region, previousYear }: { region: Region; previousYear: str
           <AppText variant="caption" numeric bold>{amount(region.exports)}</AppText>
           <AppText variant="caption" tone="muted">
             {`${signed(exportsYoY, "%")} спрямо ${previousYear ?? "миналия сезон"}`}
-            {region.exportsChange !== null && region.exportsChange !== 0 ? ` · ${signed(region.exportsChange)} за месеца` : ""}
+            {region.exportsChange !== null && region.exportsChange !== 0 ? ` · ${signed(region.exportsChange)} ${UNIT} за месеца` : ""}
           </AppText>
         </View>
       </View>

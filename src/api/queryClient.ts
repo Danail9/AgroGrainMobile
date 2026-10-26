@@ -44,8 +44,9 @@ export const persister = createAsyncStoragePersister({
 export const persistOptions = {
   persister,
   maxAge: CACHE_MAX_AGE,
-  // Invalidate national prices even for OTA updates within the same app version.
-  buster: `${APP_VERSION}:manual-port-prices-v1`,
+  // Bump on contract changes so persisted responses, which skip schema defaults,
+  // are discarded even for OTA updates within the same app version.
+  buster: `${APP_VERSION}:wasde-detail-v2`,
   dehydrateOptions: {
     shouldDehydrateQuery: (query: Query) =>
       query.meta?.persist !== false && defaultShouldDehydrateQuery(query),

@@ -4,6 +4,7 @@ Native iOS and Android app for AgroGrain, built with Expo SDK 57 and React Nativ
 It talks to the AgroGrain portal's `/api/v1` and reuses the portal's design tokens and
 Bulgarian copy. Design: [docs/superpowers/specs](docs/superpowers/specs/2026-10-04-agromobile-design.md).
 What was actually built and what is left: [docs/implementation-notes.md](docs/implementation-notes.md).
+Use Node.js 26.12.1, pinned in [.nvmrc](.nvmrc) and the EAS build profiles.
 
 ## Run it on your phone (QR code, Expo Go)
 
@@ -112,8 +113,9 @@ src/theme/      colour, spacing and type tokens from the portal's globals.css
 - **One phone per account.** The portal allows one browser session and one phone session. A
   second phone is refused until the first signs out or an admin approves it.
 - **Offline.** Reads come from a cache kept for 7 days and are labelled "обновено преди …".
-  Changes need a connection. The manual-port-prices cache revision discards older
-  national-price responses, including after same-version OTA updates.
+  Changes need a connection. The persisted cache has a revision string (`buster` in
+  `src/api/queryClient.ts`) that is bumped on API contract changes so stale responses,
+  which bypass schema defaults, are discarded even after same-version OTA updates.
 - The News screen shows the latest USDA WASDE global wheat, corn, rice and soybean estimates
   in Bulgarian, with a link to the readable PDF report. Each crop shows production, ending
   stocks and stocks-to-use with the change versus the previous season, a deterministic

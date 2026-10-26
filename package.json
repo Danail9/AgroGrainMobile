@@ -61,6 +61,9 @@
     "check:contract": "tsx scripts/check-contract.ts"
   },
   "private": true,
+  "engines": {
+    "node": ">=26.12.1 <27"
+  },
   "overrides": {
     "react-native-worklets": "0.10.1",
     "react-native-reanimated": "4.5.1"

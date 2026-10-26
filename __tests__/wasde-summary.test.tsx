@@ -62,23 +62,25 @@ describe("WasdeSummaryCard", () => {
     expect(screen.getByText("По-стегнат баланс")).toBeTruthy();
     expect(screen.getByText("Без ясна посока")).toBeTruthy();
     expect(screen.getByText("Сезон 2026/27 · спрямо 2025/26")).toBeTruthy();
-    expect(screen.getByText("822,39")).toBeTruthy();
+    expect(screen.getByText("822,39 млн. т")).toBeTruthy();
+    expect(screen.getByText(/1 млн\. т = 1 000 000 тона/)).toBeTruthy();
     expect(screen.getByText("−2,6% г/г")).toBeTruthy();
     expect(screen.getByText("33,3%")).toBeTruthy();
     expect(screen.getByText("−0,9 п. г/г")).toBeTruthy();
     expect(screen.getByText("Сезон 2026/27")).toBeTruthy();
     expect(screen.queryByText("Ключови региони за България")).toBeNull();
-    expect(screen.queryByText("827,90")).toBeNull();
+    expect(screen.queryByText("827,90 млн. т")).toBeNull();
 
     await fireEvent.press(screen.getByLabelText("Покажи подробности за Пшеница"));
     expect(screen.getByText("Запасите спрямо потреблението намаляват — предлагането е по-ограничено.")).toBeTruthy();
-    expect(screen.getByText("827,90")).toBeTruthy();
+    expect(screen.getByText("827,90 млн. т")).toBeTruthy();
     expect(screen.getByText("Търговия")).toBeTruthy();
     expect(screen.getByText("Ревизия на запасите спрямо септември 2026")).toBeTruthy();
-    expect(screen.getByText("−0,25")).toBeTruthy();
+    expect(screen.getByText("−0,25 млн. т")).toBeTruthy();
     expect(screen.getByText("Ключови региони за България")).toBeTruthy();
     expect(screen.getByText("Русия")).toBeTruthy();
-    expect(screen.getByText("−16,7% спрямо 2025/26 · −3,00 за месеца")).toBeTruthy();
+    expect(screen.getByText("−16,7% спрямо 2025/26 · −3,00 млн. т за месеца")).toBeTruthy();
+    expect(screen.getByText("88,00 млн. т")).toBeTruthy();
     expect(screen.getByText("+7,9% спрямо 2025/26")).toBeTruthy();
     expect(screen.getByText(/Русия, Украйна и ЕС са преките конкуренти/)).toBeTruthy();
 
@@ -108,6 +110,21 @@ describe("WasdeSummaryCard", () => {
     expect(screen.getByText(/показваме последното заредено обобщение/)).toBeTruthy();
     await fireEvent.press(screen.getByLabelText("Покажи подробности за Пшеница"));
     expect(screen.getByText("Ревизия на производството")).toBeTruthy();
+  });
+
+  it("survives a persisted summary that skipped schema defaults entirely", async () => {
+    const persisted = {
+      reportMonth: "октомври 2026", sourceUrl, unit: "млн. метрични тона", comparisonMonth: "септември 2026", highlights: [],
+      estimates: [{
+        commodity: "Пшеница", marketYear: "2026/27", production: 825, totalUse: 810, trade: 205, tradeLabel: "Търговия",
+        endingStocks: 270, productionChange: 5, totalUseChange: 1, tradeChange: 5, endingStocksChange: 2,
+      }],
+    } as unknown as typeof summary;
+    await render(<WasdeSummaryCard summary={persisted} loading={false} error={false} />);
+    await fireEvent.press(screen.getByLabelText("Покажи подробности за Пшеница"));
+    expect(screen.getByText("810,00 млн. т")).toBeTruthy();
+    expect(screen.queryByText("Ключови региони за България")).toBeNull();
+    expect(screen.queryByText(/Защо е важно/)).toBeNull();
   });
 
   it("shows an explicit error when the report cannot be loaded", async () => {
