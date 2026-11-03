@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
-import { isApiError } from "@/api/client";
+import { ApiClientError, isApiError } from "@/api/client";
+import { qualityCrop, QUALITY_LABELS } from "@/api/schemas";
 import { useCreateListing, useCreateOffer, useMarket, useMe } from "@/api/queries";
 import { VALIDITY_CHOICES, normalizeDecimal, numericInput, validUntil, type ValidityValue } from "@/lib/forms";
 import { findMarketRow, formatPrice, marketDelta } from "@/lib/trade";
@@ -12,8 +13,10 @@ import { Icon } from "@/ui/Icon";
 import { PortPriceQuotes } from "@/ui/PortPriceQuotes";
 import { pressedStyle } from "@/ui/primitives";
 import { AppText } from "@/ui/Text";
+import { CropQualityFields, useCropQuality } from "@/ui/CropQualityFields";
 
 export type CatalogOption = { slug: string; name: string; emoji?: string };
+const QUALITY_ERROR_FIELDS = ["quality", "quality.cropSlug", ...Object.keys(QUALITY_LABELS).map((field) => `quality.${field}`)];
 
 /** Market rows and the user's favourite crops, for the picker and price hints. */
 function useMarketContext() {
@@ -74,8 +77,11 @@ export function OfferForm({
 
   const options = category === "CROP" ? crops : category === "FERTILIZER" ? fertilizers : [];
   const ctx = useMarketContext();
+  const quality = useCropQuality();
+  const crop = category === "CROP" ? qualityCrop(crops.find((item) => item.name === choice)?.slug) : null;
 
   function reset() {
+    quality.clear();
     setCategory("CROP");
     setChoice("");
     setCustom("");
@@ -88,6 +94,14 @@ export function OfferForm({
   function submit() {
     form.clear();
     setSuccess(null);
+    const parsedQuality = quality.input(crop);
+    if (!parsedQuality.success) {
+      const issue = parsedQuality.error.issues[0];
+      form.fail(new ApiClientError("validation_failed", issue.message, {
+        field: `quality.${issue.path.join(".")}`,
+      }), QUALITY_ERROR_FIELDS);
+      return;
+    }
     create.mutate(
       {
         category,
@@ -96,13 +110,14 @@ export function OfferForm({
         unit,
         note,
         validUntil: validUntil(validity),
+        ...(parsedQuality.data ? { quality: parsedQuality.data } : {}),
       },
       {
         onSuccess: () => {
           setSuccess("Офертата е публикувана успешно.");
           reset();
         },
-        onError: (e) => form.fail(e, ["title", "price", "unit", "note", "validUntil"]),
+        onError: (e) => form.fail(e, ["title", "price", "unit", "note", "validUntil", ...QUALITY_ERROR_FIELDS]),
       },
     );
   }
@@ -119,6 +134,7 @@ export function OfferForm({
           setCategory(value);
           setChoice("");
           setCustom("");
+          quality.clear();
         }}
       />
 
@@ -130,7 +146,7 @@ export function OfferForm({
         favorites={category === "CROP" ? ctx.favorites : undefined}
         choice={choice}
         custom={custom}
-        onChoice={setChoice}
+        onChoice={(value) => { setChoice(value); quality.clear(); }}
         onCustom={setCustom}
         placeholder={category === "SEED" ? "Семена пшеница" : "Пшеница хлебна"}
         error={form.fields.title}
@@ -165,6 +181,8 @@ export function OfferForm({
         error={form.fields.note}
       />
 
+      {crop ? <CropQualityFields crop={crop} values={quality.values} onChange={quality.change} errors={form.fields} /> : null}
+      {form.fields.quality || form.fields["quality.cropSlug"] ? <FormMessage error={form.fields.quality ?? form.fields["quality.cropSlug"]} /> : null}
       <Button
         title="Публикувай оферта"
         onPress={submit}
@@ -192,9 +210,12 @@ export function ListingForm({ crops }: { crops: CatalogOption[] }) {
   const [showSample, setShowSample] = useState(false);
   const ctx = useMarketContext();
   const title = titleOf(choice, custom);
+  const quality = useCropQuality();
+  const crop = qualityCrop(crops.find((item) => item.name === choice)?.slug);
   const sampleCount = [hectolitre, protein, gluten].filter((value) => value.trim()).length;
 
   function reset() {
+    quality.clear();
     setChoice("");
     setCustom("");
     setQuantity("");
@@ -210,6 +231,14 @@ export function ListingForm({ crops }: { crops: CatalogOption[] }) {
   function submit() {
     form.clear();
     setSuccess(null);
+    const parsedQuality = quality.input(crop);
+    if (!parsedQuality.success) {
+      const issue = parsedQuality.error.issues[0];
+      form.fail(new ApiClientError("validation_failed", issue.message, {
+        field: `quality.${issue.path.join(".")}`,
+      }), QUALITY_ERROR_FIELDS);
+      return;
+    }
     create.mutate(
       {
         title: titleOf(choice, custom),
@@ -217,9 +246,10 @@ export function ListingForm({ crops }: { crops: CatalogOption[] }) {
         askPrice: normalizeDecimal(askPrice),
         unit,
         note,
-        hectolitre: normalizeDecimal(hectolitre),
-        protein: normalizeDecimal(protein),
-        gluten: normalizeDecimal(gluten),
+        hectolitre: crop ? "" : normalizeDecimal(hectolitre),
+        protein: crop ? "" : normalizeDecimal(protein),
+        gluten: crop ? "" : normalizeDecimal(gluten),
+        ...(parsedQuality.data ? { quality: parsedQuality.data } : {}),
       },
       {
         onSuccess: () => {
@@ -236,6 +266,7 @@ export function ListingForm({ crops }: { crops: CatalogOption[] }) {
             "hectolitre",
             "protein",
             "gluten",
+            ...QUALITY_ERROR_FIELDS,
           ]),
       },
     );
@@ -252,7 +283,13 @@ export function ListingForm({ crops }: { crops: CatalogOption[] }) {
           options={crops}
           choice={choice}
           custom={custom}
-          onChoice={setChoice}
+          onChoice={(value) => {
+            setChoice(value);
+            quality.clear();
+            setHectolitre("");
+            setProtein("");
+            setGluten("");
+          }}
           onCustom={setCustom}
           placeholder="Люцерна"
           error={form.fields.title}
@@ -283,7 +320,7 @@ export function ListingForm({ crops }: { crops: CatalogOption[] }) {
         <MarketHint title={title} price={askPrice} unit={unit} prices={ctx.prices} onUse={setAskPrice} />
       </Section>
 
-      <View style={styles.section}>
+      {crop ? <CropQualityFields crop={crop} values={quality.values} onChange={quality.change} errors={form.fields} /> : <View style={styles.section}>
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ expanded: showSample }}
@@ -338,7 +375,8 @@ export function ListingForm({ crops }: { crops: CatalogOption[] }) {
             </View>
           </View>
         ) : null}
-      </View>
+      </View>}
+      {form.fields.quality || form.fields["quality.cropSlug"] ? <FormMessage error={form.fields.quality ?? form.fields["quality.cropSlug"]} /> : null}
 
       <Section step={4} title="Бележка (по избор)">
         <TextField

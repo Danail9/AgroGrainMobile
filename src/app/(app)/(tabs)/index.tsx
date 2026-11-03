@@ -3,12 +3,11 @@ import { router } from "expo-router";
 import { useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
-import { keys, useHome, useMarket, useMe, useNotifications, useTrade, useWeather } from "@/api/queries";
-import type { Home, WeatherResponse } from "@/api/schemas";
+import { keys, useHome, useMarket, useMe, useNotifications, useRegions, useTrade, useWeather } from "@/api/queries";
+import { CROP_QUALITY_FIELDS, QUALITY_LABELS, type CropQuality, type Home, type WeatherResponse } from "@/api/schemas";
 import { formatLongDate, formatNumber, greeting, relativeTime, updatedAgo } from "@/lib/format";
 import { expiringSoon, expiryOf, findMarketRow, formatPrice, marketDelta } from "@/lib/trade";
 import { colors, radius, shadowCard, space } from "@/theme/tokens";
-import { BriefingSections } from "@/ui/BriefingSections";
 import { HeaderActions } from "@/ui/HeaderActions";
 import { Icon, type IconName } from "@/ui/Icon";
 import { PriceRow } from "@/ui/PriceRow";
@@ -27,6 +26,8 @@ import { Screen } from "@/ui/Screen";
 import { AppText } from "@/ui/Text";
 import { WeatherGlyph } from "@/ui/WeatherGlyph";
 import { reportError } from "@/lib/monitoring";
+import { CropQualitySpecs } from "@/ui/CropQualitySpecs";
+import { Button } from "@/ui/forms";
 
 type FarmerHome = Extract<Home, { role: "FARMER" }>;
 type TraderHome = Extract<Home, { role: "TRADER" }>;
@@ -91,6 +92,7 @@ export default function HomeScreen() {
               liveWeather={weather.data?.weather}
               weatherUnavailable={weather.isError && !weather.data}
               favorites={me.data?.favoriteCrops ?? []}
+              regionSlug={me.data?.user.regionSlug}
             />
           ) : data.role === "TRADER" ? (
             <TraderView data={data} favorites={me.data?.favoriteCrops ?? []} now={home.dataUpdatedAt} />
@@ -107,19 +109,26 @@ function FarmerView({
   liveWeather,
   weatherUnavailable,
   favorites,
+  regionSlug,
 }: {
   data: FarmerHome;
   canTrade: boolean;
   liveWeather?: WeatherResponse["weather"];
   weatherUnavailable: boolean;
   favorites: string[];
+  regionSlug?: string;
 }) {
   const homeWeather = data.weather;
   const current = liveWeather?.current ?? homeWeather.current;
   const today = liveWeather?.daily[0] ?? homeWeather.today;
   const work = homeWeather.fieldWork;
   const market = useMarket();
-  const prices = homePrices(data.prices, market.data?.prices, favorites);
+  const regions = useRegions();
+  const prices = homePrices(data.prices, market.data?.prices, favorites).slice(0, 3);
+  const offers = [...data.offers].sort((a, b) =>
+    Number(b.regionSlug === regionSlug) - Number(a.regionSlug === regionSlug)).slice(0, 3);
+  const insight = data.summary.sections.find((section) =>
+    ["risk", "tip", "news"].includes(section.icon) && section.body.trim());
   const showChange = prices.some((price) => price.changePct !== null);
   const level = work ? LEVEL[work.level] : null;
 
@@ -199,11 +208,6 @@ function FarmerView({
               value={`${Math.round(current.windSpeed)} км/ч`}
               label="Вятър"
             />
-            <StatChip
-              icon={<Icon name="speedometer" size={15} color={colors.brand[500]} />}
-              value={`${Math.round(current.humidity)}%`}
-              label="Влажност"
-            />
           </View>
         </Pressable>
 
@@ -243,8 +247,11 @@ function FarmerView({
         ) : null}
       </Card>
 
-      <View>
-        <SectionHeader title="Пазарни цени (€/т)" action="Виж всички" href="/market" />
+      <View style={{ gap: space.sm }}>
+        <SectionHeader title="Пазарни цени (€/т)" />
+        {!!market.dataUpdatedAt && <AppText variant="caption" tone="muted" style={{ marginBottom: space.sm }}>
+          Референтни цени · {updatedAgo(market.dataUpdatedAt)}
+        </AppText>}
         <RowList>
           {prices.map((price, index) => (
             <View key={price.slug}>
@@ -253,17 +260,17 @@ function FarmerView({
             </View>
           ))}
         </RowList>
+        <Button title="Виж всички пазарни цени" variant="secondary" icon="stats-chart-outline"
+          onPress={() => router.push("/market")} />
       </View>
 
-      {canTrade && data.offers.length ? (
-        <View>
+      {canTrade ? (
+        <View style={{ gap: space.sm }}>
           <SectionHeader
-            title={`Оферти от търговци (${data.offers.length})`}
-            action="Към борсата"
-            href="/trade"
+            title="Оферти от търговци"
           />
-          <RowList>
-            {data.offers.map((offer, index) => (
+          {offers.length ? <RowList>
+            {offers.map((offer, index) => (
               <View key={offer.id}>
                 {index > 0 ? <Divider /> : null}
                 <Pressable
@@ -286,6 +293,10 @@ function FarmerView({
                     <AppText variant="caption" tone="muted">
                       {offer.trader.farmName || offer.trader.name}
                     </AppText>
+                    {regions.data?.regions.find((region) => region.slug === offer.regionSlug)?.name && <AppText variant="caption" tone="muted">
+                      {regions.data.regions.find((region) => region.slug === offer.regionSlug)?.name}
+                    </AppText>}
+                    <CropQualitySpecs quality={offer.quality} />
                   </View>
                   <AppText variant="body" bold numeric style={{ fontSize: 17 }}>
                     {formatNumber(offer.price)}{" "}
@@ -296,60 +307,41 @@ function FarmerView({
                 </Pressable>
               </View>
             ))}
-          </RowList>
+          </RowList> : <Card><AppText variant="small" tone="muted">Няма налични оферти. Виж борсата за нови предложения.</AppText></Card>}
+          <Button title="Отвори борсата" icon="swap-horizontal-outline"
+            onPress={() => router.push("/trade")} />
         </View>
       ) : null}
 
-      <Card padded={false} style={{ overflow: "hidden" }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Виж целия дневен обзор"
-          onPress={() => router.push("/ai/daily")}
-          style={({ pressed }) => pressed && pressedStyle}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: space.md,
-              padding: space.lg,
-              backgroundColor: colors.brand[50],
-            }}
-          >
+      <Card style={{ backgroundColor: colors.brand[50], borderColor: colors.brand[100], gap: space.lg }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
             <IconTile tone="solid" size="md">
               <Icon name="sparkles" size={20} color={colors.white} />
             </IconTile>
             <View style={{ flex: 1 }}>
-              <AppText variant="small" bold style={{ color: colors.brand[700] }}>
+              <AppText variant="caption" bold style={{ color: colors.brand[700] }}>
                 AgroGrain AI
               </AppText>
-              <AppText variant="small" bold>
-                Какво е важно за теб днес?
+              <AppText variant="heading" bold>
+                Твоят дневен обзор
               </AppText>
             </View>
           </View>
-        </Pressable>
-        <BriefingSections sections={data.summary.sections.slice(0, 4)} />
-        <Divider />
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push("/ai/daily")}
-          style={({ pressed }) => [
-            {
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-              padding: space.md,
-            },
-            pressed && pressedStyle,
-          ]}
-        >
-          <AppText variant="small" tone="brand" bold>
-            Виж целия обзор
-          </AppText>
-          <Icon name="chevron-forward" size={16} color={colors.brand[600]} />
-        </Pressable>
+        {insight ? <View style={{ padding: space.lg, borderRadius: radius.lg, backgroundColor: colors.white, gap: space.sm }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start",
+            backgroundColor: colors.soft, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 }}>
+            <Icon name={insight.icon === "risk" ? "alert-circle-outline" : insight.icon === "news" ? "newspaper-outline" : "bulb-outline"}
+              size={16} color={colors.brand[600]} />
+            <AppText variant="caption" bold tone="brand">
+              {insight.icon === "risk" ? "Внимание" : insight.icon === "news" ? "От новините" : "Полезен съвет"}
+            </AppText>
+          </View>
+          <AppText variant="body" bold>{insight.title}</AppText>
+          <AppText variant="small" tone="muted" numberOfLines={4}>{insight.body}</AppText>
+        </View> : <AppText variant="small" tone="muted">
+          Виж наличния обзор за времето, пазара и полската работа.
+        </AppText>}
+        <Button title="Отвори дневния обзор" icon="arrow-forward-outline" onPress={() => router.push("/ai/daily")} />
       </Card>
     </>
   );
@@ -498,11 +490,15 @@ function TraderView({ data, favorites, now }: { data: TraderHome; favorites: str
   );
 }
 
-function specsLine(listing: { hectolitre: number | null; protein: number | null; gluten: number | null }) {
+function specsLine(listing: { hectolitre: number | null; protein: number | null; gluten: number | null; quality?: CropQuality | null }) {
   return [
     listing.hectolitre !== null ? `${formatNumber(listing.hectolitre)} кг/хл` : null,
     listing.protein !== null ? `протеин ${formatNumber(listing.protein)}%` : null,
     listing.gluten !== null ? `глутен ${formatNumber(listing.gluten)}%` : null,
+    ...(listing.quality ? CROP_QUALITY_FIELDS[listing.quality.cropSlug].flatMap((field) => {
+      const value = listing.quality?.[field];
+      return value === undefined ? [] : [`${QUALITY_LABELS[field]} ${formatNumber(value, 2)}%`];
+    }) : []),
   ]
     .filter(Boolean)
     .join(" · ");

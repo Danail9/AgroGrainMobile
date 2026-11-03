@@ -16,11 +16,12 @@ const TAB: Record<string, TabDef> = {
   trade: { name: "trade", title: "Борса", icon: "swap-horizontal-outline", iconActive: "swap-horizontal" },
   news: { name: "news", title: "Новини", icon: "newspaper-outline", iconActive: "newspaper" },
   ai: { name: "ai", title: "AI", icon: "sparkles-outline", iconActive: "sparkles" },
+  map: { name: "map", title: "Карта", icon: "map-outline", iconActive: "map" },
 };
 
-const FARMER_TABS = [TAB.index, TAB.weather, TAB.market, TAB.trade, TAB.news, TAB.ai];
-const TRADER_TABS = [TAB.dashboard, TAB.trade, TAB.market, TAB.news, TAB.ai];
-const ALL = ["index", "weather", "market", "trade", "news", "ai"];
+const FARMER_TABS = [TAB.index, TAB.weather, TAB.market, TAB.trade, TAB.news, TAB.map, TAB.ai];
+const TRADER_TABS = [TAB.dashboard, TAB.trade, TAB.market, TAB.news, TAB.map, TAB.ai];
+const ALL = ["index", "weather", "market", "trade", "news", "map", "ai"];
 
 export default function TabsLayout() {
   const me = useMe();

@@ -112,9 +112,14 @@ export default function MarketScreen() {
 }
 
 function Grain({ data, favorites }: { data: Market; favorites: string[] }) {
+  if (!data.prices.length) {
+    return <EmptyState title="Няма оферти" description="Все още няма публикувани пристанищни оферти." />;
+  }
   return (
     <Tabs
-      items={CATEGORIES.map((category) => {
+      items={CATEGORIES.filter((category) =>
+        data.prices.some((price) => price.category === category.key),
+      ).map((category) => {
         const prices = favoritesFirst(
           data.prices.filter((price) => price.category === category.key),
           favorites,

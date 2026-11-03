@@ -8,6 +8,8 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 export default ({ config }: ConfigContext): ExpoConfig => {
   const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim();
   const plugins = [...(config.plugins ?? [])];
+  const androidMapsKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY?.trim();
+  plugins.push(["react-native-maps", { androidGoogleMapsApiKey: androidMapsKey }]);
 
   if (iosClientId) {
     const iosUrlScheme = `com.googleusercontent.apps.${iosClientId.replace(
@@ -37,7 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
   return {
     ...(config as ExpoConfig),
-    extra: { ...config.extra, iosPersonalTeam: personalTeam },
+    extra: { ...config.extra, iosPersonalTeam: personalTeam, androidMapsConfigured: !!androidMapsKey },
     ios: personalTeam
       ? { ...config.ios, usesAppleSignIn: false, associatedDomains: [] }
       : config.ios,

@@ -1,210 +1,70 @@
 import { router, type Href } from "expo-router";
+import { useState } from "react";
 import { Pressable, View } from "react-native";
-
 import { useMe, useWeather } from "@/api/queries";
 import { SUGGESTIONS } from "@/lib/ai";
-import { formatHour, monthName } from "@/lib/format";
-import { colors, radius, space } from "@/theme/tokens";
+import { updatedAgo } from "@/lib/format";
+import { colors, space } from "@/theme/tokens";
 import { Icon, type IconName } from "@/ui/Icon";
-import { Card, IconTile, LinkRow, pressedStyle, tileColor } from "@/ui/primitives";
+import { Card, IconTile, pressedStyle } from "@/ui/primitives";
+import { QueryBoundary, Notice } from "@/ui/QueryBoundary";
+import { Button } from "@/ui/forms";
 import { Screen } from "@/ui/Screen";
 import { AppText } from "@/ui/Text";
 
-const SHORTCUTS: { href: Href; label: string; icon: IconName }[] = [
-  { href: "/ai/daily", label: "Важно днес", icon: "sparkles" },
-  { href: "/ai/weather", label: "Време", icon: "partly-sunny" },
-  { href: "/ai/market", label: "Пазар", icon: "stats-chart" },
-  { href: "/ai/weekly", label: "Съвети", icon: "calendar" },
+const TOOLS: { href: Href; label: string; description: string; icon: IconName }[] = [
+  { href: "/ai/daily", label: "Дневен обзор", description: "Най-важното за днес", icon: "sparkles-outline" },
+  { href: "/ai/weather", label: "Анализ на времето", description: "Условия за полска работа", icon: "partly-sunny-outline" },
+  { href: "/ai/market", label: "Пазарен обзор", description: "Цени и тенденции", icon: "stats-chart-outline" },
+  { href: "/ai/calculator", label: "Калкулатори", description: "Семена, торове и добив", icon: "calculator-outline" },
 ];
 
 export default function AiScreen() {
   const me = useMe();
   const weather = useWeather();
-
-  const today = weather.data?.fieldWork[0];
-  const spray = weather.data?.sprayWindow;
-  const nextGood = weather.data?.fieldWork.slice(1).find((day) => day.level === "good");
-  const regionName = me.data?.user.regionName;
-
-  return (
-    <Screen tabbed title="AgroGrain AI" subtitle="Твоят земеделски асистент">
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Попитай AgroGrain AI"
-        onPress={() => router.push("/ai/chat")}
-        style={({ pressed }) => [
-          {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: space.md,
-            backgroundColor: colors.white,
-            borderRadius: radius.pill,
-            borderWidth: 1,
-            borderColor: colors.brand[200],
-            paddingHorizontal: space.lg,
-            paddingVertical: 14,
-          },
-          pressed && pressedStyle,
-        ]}
-      >
-        <Icon name="chatbubble-ellipses" size={20} color={colors.brand[600]} />
-        <AppText variant="small" tone="muted" style={{ flex: 1 }}>
-          Напиши своя въпрос…
-        </AppText>
-        <Icon name="send" size={16} color={colors.brand[600]} />
-      </Pressable>
-
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        {SHORTCUTS.map((shortcut) => (
-          <Pressable
-            key={shortcut.label}
-            accessibilityRole="button"
-            onPress={() => router.push(shortcut.href)}
-            style={({ pressed }) => [{ flex: 1 }, pressed && pressedStyle]}
-          >
-            <Card style={{ alignItems: "center", gap: 8, paddingHorizontal: 4, paddingVertical: 12 }}>
-              <IconTile tone="brand" size="sm">
-                <Icon name={shortcut.icon} size={17} color={tileColor("brand")} />
-              </IconTile>
-              <AppText variant="caption" bold align="center">
-                {shortcut.label}
-              </AppText>
-            </Card>
-          </Pressable>
-        ))}
-      </View>
-
-      <LinkRow
-        href="/ai/calculator"
-        title="AI калкулатор"
-        subtitle="Бързи изчисления за семена, торове и добив"
-        icon={
-          <IconTile tone="brand" size="md">
-            <Icon name="calculator" size={18} color={tileColor("brand")} />
-          </IconTile>
-        }
-      />
-
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push("/ai/weather")}
-          style={({ pressed }) => [{ flex: 1 }, pressed && pressedStyle]}
-        >
-          <Card style={{ flexDirection: "row", alignItems: "center", gap: 10, padding: 12 }}>
-            <IconTile tone="sky" size="sm">
-              <Icon name="partly-sunny" size={17} color={tileColor("sky")} />
-            </IconTile>
-            <View style={{ flex: 1 }}>
-              <AppText variant="small" bold numberOfLines={1}>
-                {weather.data
-                  ? `${Math.round(weather.data.weather.current.temperature)}° · ${today?.label ?? ""}`
-                  : "Времето"}
-              </AppText>
-              <AppText variant="caption" tone="muted" numberOfLines={2}>
-                {today?.reason ?? "Виж анализа на времето"}
-              </AppText>
-            </View>
-          </Card>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push("/ai/market")}
-          style={({ pressed }) => [{ flex: 1 }, pressed && pressedStyle]}
-        >
-          <Card style={{ flexDirection: "row", alignItems: "center", gap: 10, padding: 12 }}>
-            <IconTile tone="brand" size="sm">
-              <Icon name="stats-chart" size={17} color={tileColor("brand")} />
-            </IconTile>
-            <View style={{ flex: 1 }}>
-              <AppText variant="small" bold numberOfLines={1}>
-                Пазарен обзор
-              </AppText>
-              <AppText variant="caption" tone="muted" numberOfLines={2}>
-                Оферти за Варна и Бургас
-              </AppText>
-            </View>
-          </Card>
-        </Pressable>
-      </View>
-
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => router.push("/ai/daily")}
-        style={({ pressed }) => [
-          {
-            gap: space.md,
-            borderRadius: radius.lg,
-            borderWidth: 1,
-            borderColor: colors.brand[100],
-            backgroundColor: colors.brand[50],
-            padding: 14,
-          },
-          pressed && pressedStyle,
-        ]}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
-          <IconTile tone="solid" size="sm">
-            <Icon name="sparkles" size={16} color={colors.white} />
-          </IconTile>
-          <View style={{ flex: 1 }}>
-            <AppText variant="small" bold style={{ color: colors.brand[800] }}>
-              Съвет за днес
-            </AppText>
-            <AppText variant="caption" style={{ color: colors.brand[700] }}>
-              AI препоръка{regionName ? ` за ${regionName}` : ""}
-            </AppText>
-          </View>
-          <Icon name="chevron-forward" size={18} color={colors.brand[600]} />
+  const [moreQuestions, setMoreQuestions] = useState(false);
+  return <Screen tabbed title="AgroGrain AI" subtitle="Твоят земеделски асистент">
+    <QueryBoundary query={me} stamp={false}>{({ user }) => <View style={{ gap: space.xs }}>
+      <AppText variant="small" bold>Регион от профила: {user.regionName}</AppText>
+      <AppText variant="caption" tone="muted">Временният избор във Време не променя контекста на AI.</AppText>
+    </View>}</QueryBoundary>
+    <Card style={{ backgroundColor: colors.brand[50], gap: space.md }}>
+      <View style={{ flexDirection: "row", gap: space.md, alignItems: "center" }}>
+        <IconTile tone="solid" size="md"><Icon name="chatbubble-ellipses-outline" color={colors.white} /></IconTile>
+        <View style={{ flex: 1 }}>
+          <AppText variant="heading">Попитай AgroGrain AI</AppText>
+          <AppText variant="small" tone="muted">За времето, пазара и земеделската работа</AppText>
         </View>
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <View style={{ flex: 1, backgroundColor: colors.white, borderRadius: 12, padding: 10 }}>
-            <AppText variant="caption" tone="muted">
-              Пръскане
-            </AppText>
-            <AppText variant="small" bold numeric>
-              {spray
-                ? `${formatHour(new Date(spray.from))} – ${formatHour(new Date(spray.to))}`
-                : weather.data
-                  ? "Неподходящо днес"
-                  : "—"}
-            </AppText>
-          </View>
-          <View style={{ flex: 1, backgroundColor: colors.white, borderRadius: 12, padding: 10 }}>
-            <AppText variant="caption" tone="muted">
-              Следващ добър ден
-            </AppText>
-            <AppText variant="small" bold numberOfLines={1}>
-              {nextGood
-                ? `${new Date(nextGood.date).getDate()} ${monthName(new Date(nextGood.date).getMonth())}`
-                : weather.data
-                  ? "Няма в прогнозата"
-                  : "—"}
-            </AppText>
-          </View>
-        </View>
-      </Pressable>
-
-      <View style={{ gap: space.sm }}>
-        <AppText variant="heading">Популярни въпроси</AppText>
-        {SUGGESTIONS.map((question) => (
-          <Pressable
-            key={question}
-            accessibilityRole="button"
-            onPress={() => router.push({ pathname: "/ai/chat", params: { q: question } })}
-            style={({ pressed }) => pressed && pressedStyle}
-          >
-            <Card style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12 }}>
-              <Icon name="sparkles" size={16} color={colors.brand[600]} />
-              <AppText variant="small" style={{ flex: 1 }}>
-                {question}
-              </AppText>
-              <Icon name="chevron-forward" size={16} color={colors.muted} />
-            </Card>
-          </Pressable>
-        ))}
       </View>
-    </Screen>
-  );
+      <Button title="Започни разговор" icon="arrow-forward-outline" onPress={() => router.push("/ai/chat")} />
+    </Card>
+    <View style={{ gap: space.sm }}>
+      {[TOOLS.slice(0, 2), TOOLS.slice(2)].map((row, index) => <View key={index}
+        testID={`ai-tool-row-${index}`} style={{ flexDirection: "row", alignItems: "stretch", gap: space.sm }}>
+      {row.map((tool) => <Pressable key={tool.href.toString()} accessibilityRole="button" accessibilityLabel={tool.label}
+        onPress={() => router.push(tool.href)} style={({ pressed }) => [{ flex: 1 }, pressed && pressedStyle]}>
+        <Card style={{ flex: 1, minHeight: 124, gap: space.sm }}>
+          <Icon name={tool.icon} size={24} color={colors.brand[600]} />
+          <AppText variant="small" bold>{tool.label}</AppText>
+          <AppText variant="caption" tone="muted">{tool.description}</AppText>
+        </Card>
+      </Pressable>)}
+      </View>)}
+    </View>
+    <QueryBoundary query={weather} stamp={false}>{(data) => <Card style={{ gap: space.sm }}>
+      <AppText bold>Условия днес · {data.weather.regionName}</AppText>
+      <AppText variant="caption" tone="muted">{updatedAgo(weather.dataUpdatedAt)} · последно получаване на данните</AppText>
+      {data.weather.isFallback ? <Notice tone="warn">Демо данни — не използвай за планиране на пръскане или полска работа.</Notice> :
+        <AppText variant="small">{data.fieldWork[0]?.reason || data.weather.current.condition.label}</AppText>}
+      <Button title="Отвори анализа на времето" compact variant="secondary" onPress={() => router.push("/ai/weather")} />
+    </Card>}</QueryBoundary>
+    <Button title="Съвети за седмицата" compact variant="secondary" icon="calendar-outline" onPress={() => router.push("/ai/weekly")} />
+    <View style={{ gap: space.sm }}>
+      <AppText variant="heading">Примерни въпроси</AppText>
+      {(moreQuestions ? SUGGESTIONS : SUGGESTIONS.slice(0, 3)).map((question) => <Button key={question} title={question}
+        variant="secondary" onPress={() => router.push({ pathname: "/ai/chat", params: { q: question } })} />)}
+      <Button title={moreQuestions ? "По-малко въпроси" : "Още въпроси"} compact variant="ghost" onPress={() => setMoreQuestions((value) => !value)} />
+    </View>
+    <AppText variant="caption" tone="muted">AI може да греши. Прогнозата не е разрешение за пръскане, а пазарният обзор не гарантира бъдещи цени.</AppText>
+  </Screen>;
 }

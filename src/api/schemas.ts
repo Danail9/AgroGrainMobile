@@ -452,10 +452,53 @@ export const chatReplySchema = z.object({
 
 /* ------------------------------------------------------------------ trade */
 
+export const CROP_QUALITY_FIELDS = {
+  sunflower: ["oilContent", "impurities"],
+  "sunflower-confection": ["oilContent", "impurities"],
+  rapeseed: ["oilContent", "impurities"],
+  chickpea: ["protein", "moisture"],
+  coriander: ["impurities"],
+  flax: ["oilContent", "impurities"],
+  "barley-malting": [],
+} as const;
+
+export const QUALITY_LABELS = {
+  oilContent: "Масленост",
+  impurities: "Примеси",
+  protein: "Протеин",
+  moisture: "Влага",
+} as const;
+export type QualityField = keyof typeof QUALITY_LABELS;
+export type QualityCrop = keyof typeof CROP_QUALITY_FIELDS;
+
+export function qualityCrop(slug: string | undefined): QualityCrop | null {
+  return slug && Object.hasOwn(CROP_QUALITY_FIELDS, slug) ? slug as QualityCrop : null;
+}
+
+const qualityPercent = z.number({ error: "Въведи процент от 0 до 100." })
+  .finite("Въведи процент от 0 до 100.").min(0, "Въведи процент от 0 до 100.")
+  .max(100, "Въведи процент от 0 до 100.").optional();
+export const cropQualitySchema = z.object({
+  cropSlug: z.enum(["sunflower", "sunflower-confection", "rapeseed", "chickpea", "coriander", "flax", "barley-malting"]),
+  oilContent: qualityPercent,
+  impurities: qualityPercent,
+  protein: qualityPercent,
+  moisture: qualityPercent,
+}).strict().superRefine((quality, ctx) => {
+  const allowed: readonly QualityField[] = CROP_QUALITY_FIELDS[quality.cropSlug];
+  for (const field of Object.keys(QUALITY_LABELS) as QualityField[]) {
+    if (quality[field] !== undefined && !allowed.includes(field)) {
+      ctx.addIssue({ code: "custom", path: [field], message: "Показателят не е приложим за тази култура." });
+    }
+  }
+});
+export type CropQuality = z.infer<typeof cropQualitySchema>;
+
 export const offerCategorySchema = z.enum(["CROP", "FERTILIZER", "SEED"]);
 export const listingStatusSchema = z.enum(["OPEN", "RESERVED", "CLOSED"]);
 
 export const traderOfferSchema = z.object({
+  quality: cropQualitySchema.nullish(),
   id: z.string(),
   category: offerCategorySchema,
   title: z.string(),
@@ -470,6 +513,7 @@ export const traderOfferSchema = z.object({
 });
 
 export const farmerListingSchema = z.object({
+  quality: cropQualitySchema.nullish(),
   id: z.string(),
   title: z.string(),
   quantityT: z.number(),
@@ -512,6 +556,7 @@ export const tradeResponseSchema = z.object({
 });
 
 export const offerDetailSchema = z.object({
+  quality: cropQualitySchema.nullish(),
   id: z.string(),
   category: offerCategorySchema,
   title: z.string(),
@@ -533,6 +578,7 @@ export const offerDetailSchema = z.object({
 });
 
 export const listingDetailSchema = z.object({
+  quality: cropQualitySchema.nullish(),
   id: z.string(),
   title: z.string(),
   quantityT: z.number(),
@@ -707,3 +753,38 @@ export type AuthResult = z.infer<typeof authResultSchema>;
 export type WeatherResponse = z.infer<typeof weatherResponseSchema>;
 export type PriceRow = z.infer<typeof priceRowSchema>;
 export type Home = z.infer<typeof homeSchema>;
+
+export const logisticsPublicFacilitySchema = z.object({
+  locationType: z.enum(["UNKNOWN", "CITY_APPROXIMATE", "ADDRESS_GEOCODED", "FACILITY_VERIFIED"]).optional(),
+  id: z.string(), slug: z.string(), name: z.string(), type: z.string(),
+  status: z.enum(["VERIFIED_OPERATIONAL", "VERIFIED_INFRASTRUCTURE", "UNVERIFIED",
+    "PLANNED", "TEMPORARILY_INACTIVE", "PERMANENTLY_CLOSED"]),
+  regionSlug: z.string().nullable(), municipality: z.string().nullable(), city: z.string().nullable(),
+  address: z.string().nullable(), latitude: z.number().nullable(), longitude: z.number().nullable(),
+  hasRailConnection: z.boolean().nullable(), supportsFreight: z.boolean().nullable(), operational: z.boolean().nullable(),
+  canLoadGrain: z.boolean().nullable(), canUnloadGrain: z.boolean().nullable(), hasGrainStorage: z.boolean().nullable(),
+  grainStorageTons: z.number().nullable(), loadingCapacityTPH: z.number().nullable(), unloadingCapacityTPH: z.number().nullable(),
+  railwayTracks: z.number().nullable(), trackLengthMeters: z.number().nullable(),
+  operatorName: z.string().nullable(), contactPerson: z.string().nullable(), contactPhone: z.string().nullable(),
+  contactEmail: z.string().nullable(), website: z.string().nullable(), description: z.string().nullable(),
+  claims: z.record(z.string(), z.enum(["PENDING", "VERIFIED", "REJECTED", "EXPIRED"])),
+  lastVerifiedAt: z.iso.datetime().nullable(), distanceKm: z.number().nullable(),
+  sources: z.array(z.object({
+    id: z.string(), sourceName: z.string(), sourceUrl: z.url(), reference: z.string().nullable(),
+    publishedAt: z.iso.datetime().nullable(), checkedAt: z.iso.datetime(),
+  })),
+});
+export type PublicLogisticsFacility = z.infer<typeof logisticsPublicFacilitySchema>;
+export const logisticsListSchema = z.object({
+  items: z.array(logisticsPublicFacilitySchema), total: z.number().int(), page: z.number().int(), pageSize: z.number().int(),
+});
+export type LogisticsList = z.infer<typeof logisticsListSchema>;
+export const logisticsMapSchema = z.object({
+  type: z.literal("FeatureCollection"),
+  features: z.array(z.object({
+    type: z.literal("Feature"), id: z.string(),
+    geometry: z.object({ type: z.literal("Point"), coordinates: z.tuple([z.number(), z.number()]) }),
+    properties: z.object({ id: z.string(), name: z.string(), type: logisticsPublicFacilitySchema.shape.type.optional(), status: logisticsPublicFacilitySchema.shape.status, color: z.string(), locationType: logisticsPublicFacilitySchema.shape.locationType }),
+  })),
+});
+export type LogisticsMapData = z.infer<typeof logisticsMapSchema>;

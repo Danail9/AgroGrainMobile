@@ -19,13 +19,13 @@ jest.mock("@/api/queries", () => ({
 jest.mock("@/ui/Screen", () => {
   const { Button, Text } = require("react-native");
   return {
-    Screen: ({ refreshing, onRefresh, right }: { refreshing: boolean; onRefresh: () => void; right: ReactNode }) => (
-      <>{right}<Text testID="refreshing">{String(refreshing)}</Text><Button title="Refresh" onPress={onRefresh} /></>
+    Screen: ({ refreshing, onRefresh, right, children }: { refreshing: boolean; onRefresh: () => void; right: ReactNode; children: ReactNode }) => (
+      <>{right}{children}<Text testID="refreshing">{String(refreshing)}</Text><Button title="Refresh" onPress={onRefresh} /></>
     ),
   };
 });
 jest.mock("@/ui/QueryBoundary", () => ({
-  QueryBoundary: ({ children }: { children: ReactNode }) => children,
+  QueryBoundary: () => null,
 }));
 
 beforeEach(() => {
@@ -39,6 +39,11 @@ it("keeps notifications and profile shortcuts without a news icon in the home he
   expect(screen.queryByRole("button", { name: "Новини" })).toBeNull();
   expect(screen.getByRole("button", { name: "Известия" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Профил" })).toBeTruthy();
+});
+
+it("does not show the Logistics shortcut now that it has a dedicated map tab", async () => {
+  await render(<HomeScreen />);
+  expect(screen.queryByRole("button", { name: /Логистика · жп и зърнени обекти/ })).toBeNull();
 });
 
 it("does not show the pull spinner for background requests or returning to Home", async () => {

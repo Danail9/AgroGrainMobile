@@ -42,6 +42,7 @@ import {
   SampleSpecs,
   pressedStyle,
 } from "@/ui/primitives";
+import { CropQualitySpecs } from "@/ui/CropQualitySpecs";
 import { ErrorState, QueryBoundary } from "@/ui/QueryBoundary";
 import { Screen } from "@/ui/Screen";
 import { Tabs } from "@/ui/Tabs";
@@ -624,6 +625,7 @@ function OfferRow({
             {offer.note}
           </AppText>
         ) : null}
+        <CropQualitySpecs quality={offer.quality} />
       </View>
       {own ? (
         <Icon name="chevron-forward" size={18} color={colors.muted} />
@@ -692,6 +694,7 @@ function ListingRow({ listing, ctx }: { listing: Listing; ctx: RowContext }) {
             </AppText>
             <MarketDelta delta={delta} />
           </View>
+          <CropQualitySpecs quality={listing.quality} />
           <SampleSpecs hectolitre={listing.hectolitre} protein={listing.protein} gluten={listing.gluten} />
           {listing.note ? (
             <AppText variant="caption" tone="muted" numberOfLines={2}>
@@ -799,6 +802,7 @@ function MyOffers({ offers, now }: { offers: Offer[]; now: number }) {
                 {formatPrice(offer.price, offer.unit)}
               </AppText>
             </View>
+            <CropQualitySpecs quality={offer.quality} />
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Pill tone={offer.isActive ? "brand" : "neutral"}>
                 {offer.isActive ? "Активна" : "Скрита"}
@@ -865,6 +869,7 @@ function MyListings({ listings }: { listings: Listing[] }) {
                 {formatNumber(listing.quantityT)} т
               </AppText>
             </View>
+            <CropQualitySpecs quality={listing.quality} />
             <SampleSpecs
               hectolitre={listing.hectolitre}
               protein={listing.protein}

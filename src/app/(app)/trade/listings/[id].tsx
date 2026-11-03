@@ -9,6 +9,7 @@ import { colors, space } from "@/theme/tokens";
 import { DetailList, DetailRow } from "@/ui/DetailRow";
 import { Button } from "@/ui/forms";
 import { Card, Pill, SampleSpecs } from "@/ui/primitives";
+import { CropQualitySpecs } from "@/ui/CropQualitySpecs";
 import { ErrorState, QueryBoundary } from "@/ui/QueryBoundary";
 import { SaveButton } from "@/ui/SaveButton";
 import { Screen } from "@/ui/Screen";
@@ -64,6 +65,7 @@ export default function ListingScreen() {
                       т
                     </AppText>
                   </AppText>
+                  <CropQualitySpecs quality={data.quality} />
                   <SampleSpecs
                     hectolitre={data.hectolitre}
                     protein={data.protein}

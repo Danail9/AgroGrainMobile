@@ -3,6 +3,7 @@ import { router } from "expo-router";
 
 import { marketResponseSchema } from "@/api/schemas";
 import { PriceRow, type PriceRowData } from "@/ui/PriceRow";
+import { averagePrice, changeSentence, latestDay } from "@/lib/market";
 
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
 
@@ -51,4 +52,21 @@ it("still supports older API responses without delivery metadata", async () => {
   await render(<PriceRow price={legacy} showChange={false} />);
   expect(screen.getByText("Пшеница хлебна")).toBeTruthy();
   expect(screen.queryByText(/Доставено/)).toBeNull();
+});
+
+it("renders and routes malting barley using its own quotes, with data-based market summaries", async () => {
+  const malting = {
+    ...price, slug: "barley-malting", name: "Ечемик пивоварен",
+    portPrices: price.portPrices?.slice(0, 1),
+  };
+  const parsed = marketResponseSchema.parse({ prices: [malting], fertilizers: [], news: [] });
+  await render(<PriceRow price={parsed.prices[0]} showChange={false} />);
+  expect(screen.getByText("Ечемик пивоварен")).toBeTruthy();
+  expect(screen.getByText("205 €/т")).toBeTruthy();
+  expect(screen.getByText("—")).toBeTruthy();
+  await fireEvent.press(screen.getByRole("button"));
+  expect(router.push).toHaveBeenCalledWith("/market/barley-malting");
+  expect(averagePrice(parsed.prices)).toBe(205);
+  expect(latestDay(parsed.prices).prices).toHaveLength(1);
+  expect(changeSentence(parsed.prices)).toContain("без надеждна база");
 });

@@ -30,6 +30,7 @@ export function Button({
   disabled = false,
   icon,
   compact = false,
+  selected,
 }: {
   title: string;
   onPress: () => void;
@@ -38,6 +39,7 @@ export function Button({
   disabled?: boolean;
   icon?: IconName;
   compact?: boolean;
+  selected?: boolean;
 }) {
   const palette = BUTTON[variant];
   const inactive = disabled || loading;
@@ -45,7 +47,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ disabled: inactive, busy: loading }}
+      accessibilityState={{ disabled: inactive, busy: loading, selected }}
       disabled={inactive}
       onPress={onPress}
       style={({ pressed }) => [

@@ -3,7 +3,10 @@ import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 
 import { isApiError } from "@/api/client";
-import { sendChat, type ChatTurn } from "@/api/queries";
+import { sendChat, useMe, type ChatTurn } from "@/api/queries";
+import { reportError } from "@/lib/monitoring";
+import { Button } from "@/ui/forms";
+import { Notice } from "@/ui/QueryBoundary";
 import { SUGGESTIONS } from "@/lib/ai";
 import { voiceSupported } from "@/lib/voice";
 import { colors, radius, space } from "@/theme/tokens";
@@ -33,24 +36,31 @@ export default function ChatScreen() {
   const [voiceMessage, setVoiceMessage] = useState<string | null>(null);
   const scroll = useRef<ScrollView>(null);
   const started = useRef(false);
+  const sending = useRef(false);
+  const me = useMe();
+  const [failed, setFailed] = useState<{ turns: ChatTurn[]; message: string } | null>(null);
 
-  async function send(text: string) {
+  async function send(text: string, retryTurns?: ChatTurn[]) {
     const question = text.trim();
-    if (!question || pending) return;
+    if (!question || sending.current) return;
+    sending.current = true;
 
-    const next: ChatTurn[] = [...messages, { role: "user", content: question }];
+    const next: ChatTurn[] = retryTurns ?? [...messages, { role: "user", content: question }];
     setMessages(next);
     setInput("");
     setPending(true);
+    setFailed(null);
 
     try {
       // The server only reads the last twenty; ten is plenty of context.
       const reply = await sendChat(next.slice(-10));
       setMessages([...next, { role: "assistant", content: reply.content }]);
     } catch (error) {
-      setMessages([...next, { role: "assistant", content: failureReply(error) }]);
+      reportError("AI chat request failed", error);
+      setFailed({ turns: next, message: failureReply(error) });
     } finally {
       setPending(false);
+      sending.current = false;
     }
   }
 
@@ -65,6 +75,7 @@ export default function ChatScreen() {
 
   return (
     <Screen back="/ai" title="AgroGrain AI" subtitle="Твоят земеделски асистент" scroll={false} keyboard>
+      <AppText variant="caption" tone="muted">Контекст: {me.data?.user.regionName ?? "регионът от профила"} · AI може да греши.</AppText>
       <ScrollView
         ref={scroll}
         style={{ flex: 1 }}
@@ -127,6 +138,16 @@ export default function ChatScreen() {
         )}
       </ScrollView>
 
+      {failed && <View style={{ gap: space.sm, paddingBottom: space.sm }}>
+        <Notice tone="warn">{failed.message}</Notice>
+        <Button title="Опитай отново" compact variant="secondary"
+          onPress={() => void send(failed.turns.at(-1)?.content ?? "", failed.turns)} />
+        <Button title="Промени въпроса" compact variant="ghost" onPress={() => {
+          setInput(failed.turns.at(-1)?.content ?? "");
+          setMessages(failed.turns.slice(0, -1));
+          setFailed(null);
+        }} />
+      </View>}
       {voiceMessage ? (
         <AppText variant="caption" tone="muted" style={{ paddingBottom: 6 }} accessibilityRole="alert">
           {voiceMessage}
@@ -140,6 +161,7 @@ export default function ChatScreen() {
           placeholder="Напиши своя въпрос…"
           placeholderTextColor={colors.muted}
           multiline
+          editable={!pending && !failed}
           maxLength={2000}
           style={styles.input}
           returnKeyType="send"
@@ -154,7 +176,7 @@ export default function ChatScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Изпрати"
-          disabled={pending || !input.trim()}
+          disabled={pending || !!failed || !input.trim()}
           onPress={() => void send(input)}
           style={({ pressed }) => [
             styles.send,

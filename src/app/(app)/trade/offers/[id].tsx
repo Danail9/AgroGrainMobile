@@ -10,6 +10,7 @@ import { DetailList, DetailRow } from "@/ui/DetailRow";
 import { showDialog } from "@/ui/Dialog";
 import { Button } from "@/ui/forms";
 import { Card, Pill } from "@/ui/primitives";
+import { CropQualitySpecs } from "@/ui/CropQualitySpecs";
 import { ErrorState, QueryBoundary } from "@/ui/QueryBoundary";
 import { SaveButton } from "@/ui/SaveButton";
 import { Screen } from "@/ui/Screen";
@@ -84,6 +85,7 @@ export default function OfferScreen() {
                       {data.note}
                     </AppText>
                   ) : null}
+                  <CropQualitySpecs quality={data.quality} />
                 </Card>
 
                 <DetailList>

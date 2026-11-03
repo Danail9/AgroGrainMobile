@@ -37,6 +37,10 @@ import {
   wasdeSummarySchema,
   weeklyBriefingSchema,
   type PriceRow,
+  type CropQuality,
+  logisticsListSchema,
+  logisticsPublicFacilitySchema,
+  logisticsMapSchema,
 } from "@/api/schemas";
 
 const MINUTE = 60_000;
@@ -68,6 +72,9 @@ export const keys = {
   daily: ["briefing", "daily"] as const,
   weekly: ["briefing", "weekly"] as const,
   wasde: ["wasde"] as const,
+  logistics: (query: string, page: number) => ["logistics", "list", query, page] as const,
+  logisticsFacility: (id: string) => ["logistics", "facility", id] as const,
+  logisticsMap: (query: string, bbox: string | null) => ["logistics", "map", query, bbox] as const,
 };
 
 /** The AI briefings are cached per day on the server, so they expire at midnight. */
@@ -80,6 +87,28 @@ function untilMidnight() {
 const ok = z.object({}).passthrough();
 
 /* ------------------------------------------------------------------ reads */
+
+export const useLogistics = (query: string, page: number, enabled = true) =>
+  useQuery({
+    queryKey: keys.logistics(query, page),
+    enabled,
+    queryFn: ({ signal }) => api(`/logistics/facilities?${query}${query ? "&" : ""}page=${page}`, { schema: logisticsListSchema, signal }),
+    staleTime: 0, gcTime: 5 * MINUTE, refetchInterval: MINUTE, meta: { persist: false },
+  });
+
+export const useLogisticsFacility = (id: string | null) =>
+  useQuery({
+    queryKey: keys.logisticsFacility(id ?? ""),
+    queryFn: ({ signal }) => api(`/logistics/facilities/${encodeURIComponent(id!)}`, { schema: logisticsPublicFacilitySchema, signal }),
+    enabled: !!id, staleTime: 0, gcTime: 5 * MINUTE, refetchInterval: MINUTE, meta: { persist: false },
+  });
+
+export const useLogisticsMap = (query: string, bbox: string | null, enabled = true) =>
+  useQuery({
+    queryKey: keys.logisticsMap(query, bbox),
+    queryFn: ({ signal }) => api(`/logistics/map?${query}${query ? "&" : ""}bbox=${bbox}`, { schema: logisticsMapSchema, signal }),
+    enabled: enabled && !!bbox, staleTime: 0, gcTime: 5 * MINUTE, refetchInterval: MINUTE, meta: { persist: false },
+  });
 
 export const useVersion = () =>
   useQuery({
@@ -102,10 +131,10 @@ export const useHome = () =>
     staleTime: 15 * MINUTE,
   });
 
-export const useWeather = (enabled = true) =>
+export const useWeather = (enabled = true, region?: string) =>
   useQuery({
-    queryKey: keys.weather,
-    queryFn: ({ signal }) => api("/weather", { schema: weatherResponseSchema, signal }),
+    queryKey: region ? [...keys.weather, region] : keys.weather,
+    queryFn: ({ signal }) => api(region ? `/weather?region=${encodeURIComponent(region)}` : "/weather", { schema: weatherResponseSchema, signal }),
     staleTime: 15 * MINUTE,
     enabled,
   });
@@ -156,8 +185,9 @@ export const useInvoices = () =>
   });
 
 /** The model-written commentary is slow, so it loads after the rest of the screen. */
-export const useCropInsight = (slug: string, delivery: PriceRow["delivery"] = "NATIONAL") =>
+export const useCropInsight = (slug: string, delivery: PriceRow["delivery"] = "NATIONAL", enabled = true) =>
   useQuery({
+    enabled,
     queryKey: [...keys.cropInsight(slug), delivery],
     queryFn: ({ signal }) =>
       api(`/market/${encodeURIComponent(slug)}/insight`, { schema: cropInsightSchema, signal }),
@@ -313,6 +343,7 @@ export const deleteAccount = (input: { password: string }) =>
   api("/me", { method: "DELETE", body: input, schema: ok });
 
 export type OfferInput = {
+  quality?: CropQuality;
   category: "CROP" | "FERTILIZER" | "SEED";
   title: string;
   price: string;
@@ -357,6 +388,7 @@ export const useDeleteOffer = () =>
   );
 
 export type ListingInput = {
+  quality?: CropQuality;
   title: string;
   quantityT: string;
   askPrice: string;

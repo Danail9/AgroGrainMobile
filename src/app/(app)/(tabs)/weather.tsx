@@ -1,7 +1,8 @@
 import { router } from "expo-router";
-import { Pressable, ScrollView, View } from "react-native";
+import { useState } from "react";
+import { Modal, Pressable, ScrollView, View } from "react-native";
 
-import { useMe, useWeather } from "@/api/queries";
+import { useMe, useRegions, useWeather } from "@/api/queries";
 import type { WeatherResponse } from "@/api/schemas";
 import { capitalize, formatHour, formatShortDate, formatWeekday } from "@/lib/format";
 import { LEVEL_TONE, describeSoilMoisture } from "@/lib/weather";
@@ -14,25 +15,55 @@ import { Tabs } from "@/ui/Tabs";
 import { AppText } from "@/ui/Text";
 import { WeatherGlyph } from "@/ui/WeatherGlyph";
 import { WeatherStats } from "@/ui/WeatherStats";
+import { Button } from "@/ui/forms";
 
 const dayLabel = (iso: string) => capitalize(formatWeekday(new Date(iso)));
 
 export default function WeatherScreen() {
-  const weather = useWeather();
+  const [selectedRegion, setSelectedRegion] = useState<string>();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const weather = useWeather(true, selectedRegion);
+  const regions = useRegions();
   const me = useMe();
-  const regionName = me.data?.user.regionName;
+  const regionName = weather.data?.weather.regionName;
 
   return (
     <Screen
       tabbed
       back="/"
       title="Време"
-      subtitle={regionName ? `Прогноза за ${regionName}` : undefined}
+      subtitle={regionName ? `Прогноза и статистика за ${regionName}` : undefined}
       onRefresh={() => void weather.refetch()}
       refreshing={weather.isRefetching}
     >
+      <Card style={{ gap: space.sm }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+          <Icon name="location-outline" color={colors.brand[600]} />
+          <View style={{ flex: 1 }}>
+            <AppText bold>{regionName ? `Област: ${regionName}` : "Избран регион"}</AppText>
+            <AppText variant="caption" tone="muted">{selectedRegion ? "Временен избор — профилът не е променен" : "Регион от профила"}</AppText>
+          </View>
+        </View>
+        <Button title="Избери друга област" compact variant="secondary" icon="chevron-down-outline" onPress={() => setPickerOpen(true)} />
+        {selectedRegion && <Button title="Регион от профила" compact variant="ghost" onPress={() => setSelectedRegion(undefined)} />}
+        <AppText variant="caption" tone="muted">Данните са за представителна точка на областта, не за всяко населено място.</AppText>
+      </Card>
+      <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={() => setPickerOpen(false)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
+          <Card style={{ maxHeight: "75%", gap: space.sm }}>
+            <AppText variant="heading">Избери област за преглед</AppText>
+            <AppText variant="caption" tone="muted">Изборът променя само тази прогноза и статистика.</AppText>
+            <Button title="Затвори" compact variant="ghost" onPress={() => setPickerOpen(false)} />
+            <QueryBoundary query={regions} stamp={false}>{(data) => <ScrollView contentContainerStyle={{ gap: space.sm, paddingBottom: space.xl }}>
+              {data.regions.map((region) => <Button key={region.slug} title={region.name} variant="secondary" compact
+                selected={region.slug === (selectedRegion ?? me.data?.user.regionSlug)}
+                onPress={() => { setSelectedRegion(region.slug); setPickerOpen(false); }} />)}
+            </ScrollView>}</QueryBoundary>
+          </Card>
+        </View>
+      </Modal>
       <QueryBoundary query={weather}>
-        {(data) => <WeatherTabs data={data} regionName={regionName ?? data.weather.regionName} />}
+        {(data) => <WeatherTabs key={selectedRegion ?? "profile"} data={data} regionName={data.weather.regionName} />}
       </QueryBoundary>
     </Screen>
   );
