@@ -21,4 +21,6 @@ it("uses two content-sized tool rows and preserves all four destinations", async
     expect(router.push).toHaveBeenLastCalledWith(href);
   }
   expect(screen.getByText("Примерни въпроси")).toBeTruthy();
+  await fireEvent.press(screen.getByText("Пазарни анализи от източници"));
+  expect(router.push).toHaveBeenLastCalledWith("/ai/insights");
 });

@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 
@@ -30,11 +30,12 @@ import { AppText } from "@/ui/Text";
 type Section = "profile" | "password" | "region" | "notifications" | "delete" | "biometrics";
 
 export default function SettingsScreen() {
+  const { section } = useLocalSearchParams<{ section?: string }>();
   const me = useMe();
   const { signOut } = useAuth();
   const biometric = useBiometricLock();
   // One section open at a time keeps the page short and the open form in focus.
-  const [open, setOpen] = useState<Section | null>(null);
+  const [open, setOpen] = useState<Section | null>(section === "notifications" ? "notifications" : null);
   const toggle = (section: Section) => setOpen((current) => (current === section ? null : section));
 
   function confirmSignOut() {

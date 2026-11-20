@@ -3,12 +3,26 @@ import { act, renderHook } from "@testing-library/react-native";
 import type { ReactNode } from "react";
 
 import { api } from "@/api/client";
-import { keys, useClearNotifications, useMarkAllRead, useMarkRead } from "@/api/queries";
+import { keys, useClearNotifications, useMarkAllRead, useMarkRead, useUpdatePrefs } from "@/api/queries";
 
 jest.mock("@/api/client", () => ({
   ...jest.requireActual("@/api/client"),
   api: jest.fn(),
 }));
+
+it("reports an outdated API instead of falsely confirming an author preference was saved", async () => {
+  jest.mocked(api).mockResolvedValue({ enabled: true, push: true });
+  const client = new QueryClient({ defaultOptions: { mutations: { retry: false, gcTime: Infinity } } });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  const { result, unmount } = await renderHook(() => useUpdatePrefs(), { wrapper });
+  await act(async () => {
+    await expect(result.current.mutateAsync({ insightLinville: true })).rejects.toThrow("Необходим е обновен API");
+  });
+  unmount();
+  client.clear();
+});
 
 describe("notification badge updates", () => {
   it.each([

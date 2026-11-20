@@ -57,9 +57,9 @@ describe("settings helpers", () => {
   });
 
   it("summarises the notification switches for the role", () => {
-    expect(notificationSummary(prefs, "FARMER")).toBe("Включени · 9 от 11");
+    expect(notificationSummary(prefs, "FARMER")).toBe("Включени · 9 от 14");
     expect(notificationSummary({ ...prefs, enabled: false }, "FARMER")).toBe("Спрени");
-    expect(notificationSummary({ ...prefs, strongWind: true, goodFieldWork: true }, "ADMIN")).toBe("Всички включени");
+    expect(notificationSummary({ ...prefs, strongWind: true, goodFieldWork: true, insightSizov: true, insightLinville: true, insightFertilizerWeek: true }, "ADMIN")).toBe("Всички включени");
   });
 
   it("keeps only digits and single spaces in a phone number", () => {

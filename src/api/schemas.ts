@@ -101,6 +101,9 @@ export const plansSchema = z.object({
 
 export const notificationPrefsSchema = z.object({
   enabled: z.boolean(),
+  insightSizov: z.boolean().optional(),
+  insightLinville: z.boolean().optional(),
+  insightFertilizerWeek: z.boolean().optional(),
   newOffer: z.boolean(),
   newListing: z.boolean(),
   subscriptionUpgrade: z.boolean(),
@@ -343,6 +346,36 @@ export const newsArticleSchema = newsListItemSchema.extend({ body: z.string() })
 
 export const newsListSchema = z.object({ items: z.array(newsListItemSchema) });
 
+export const marketInsightSchema = z.object({
+  id: z.string().min(1),
+  headline: z.string(),
+  summary: z.string(),
+  analysis: z.string(),
+  translation: z.string().nullable(),
+  translationPending: z.boolean().optional(),
+  crops: z.array(z.string()),
+  fertilizerTags: z.array(z.string()).optional(),
+  direction: z.enum(["UP", "DOWN", "MIXED", "UNCLEAR"]).optional(),
+  chartUrl: z.string().regex(/^https:\/\/pbs\.twimg\.com\/media\/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)$/i).nullable().optional(),
+  regions: z.array(z.string()),
+  verification: z.enum(["UNVERIFIED", "VERIFIED", "REJECTED"]),
+  source: z.object({
+    name: z.string(), url: z.string().url(), publishedAt: z.string(),
+    lastCheckedAt: z.string().datetime().nullable().optional(),
+    checkOverdue: z.boolean().optional(),
+  }),
+  evidence: z.array(z.object({
+    claim: z.string(), name: z.string(), url: z.string().url(), checkedAt: z.string().nullable(),
+  })),
+});
+
+export const marketInsightsSchema = z.object({
+  items: z.array(marketInsightSchema), page: z.number().int().positive(), hasMore: z.boolean(),
+  filterOptions: z.object({
+    crops: z.array(z.string()), regions: z.array(z.string()), sources: z.array(z.string()),
+  }).optional(),
+});
+
 export const marketResponseSchema = z.object({
   prices: z.array(priceRowSchema),
   fertilizers: z.array(fertilizerSchema),
@@ -396,6 +429,49 @@ export const weeklyBriefingSchema = z.object({
   periodStart: isoDate,
   periodEnd: isoDate,
 });
+
+export const weeklyMarketReportPointSchema = z.object({
+  text: z.string().trim().min(20).max(700),
+  kind: z.enum(["AUTHOR_VIEW", "POSSIBLE_IMPACT"]),
+  sourceIds: z.array(z.string().min(1)).min(1).max(5),
+}).strict();
+
+export const weeklyMarketReportContentSchema = z.object({
+  changes: z.array(weeklyMarketReportPointSchema).min(1).max(4),
+  grain: z.array(weeklyMarketReportPointSchema).max(3),
+  fertilizers: z.array(weeklyMarketReportPointSchema).max(3),
+  bulgaria: z.array(weeklyMarketReportPointSchema).max(3),
+  watchlist: z.array(weeklyMarketReportPointSchema).max(3),
+}).strict();
+
+export const weeklyMarketReportSchema = z.object({
+  periodStart: isoDate,
+  periodEnd: isoDate,
+}).and(z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("ready"),
+    report: z.object({
+      id: z.string(),
+      generatedAt: isoDate,
+      content: weeklyMarketReportContentSchema,
+      basedOnTranslations: z.boolean().optional(),
+      sources: z.array(z.object({
+        id: z.string(),
+        insightId: z.string(),
+        name: z.string(),
+        username: z.enum(["sizov_andre", "jlinvillefert", "fertilizerweek1"]),
+        url: z.string().url(),
+        publishedAt: isoDate,
+        lastCheckedAt: isoDate.nullable(),
+        checkOverdue: z.boolean(),
+      })).min(2).max(24),
+    }),
+  }),
+  z.object({
+    status: z.enum(["pending", "failed", "withdrawn"]),
+    report: z.null(),
+  }),
+]));
 
 export const wasdeRegionSchema = z.object({
   name: z.string(),
@@ -693,6 +769,7 @@ export const renewalSchema = z.object({ cancelAtPeriodEnd: z.boolean() });
 /* ---------------------------------------------------------- notifications */
 
 export const notificationTypeSchema = z.enum([
+  "NEW_MARKET_INSIGHT",
   "SUBSCRIPTION_UPGRADED",
   "SUBSCRIPTION_REMINDER",
   "SUBSCRIPTION_EXPIRED",

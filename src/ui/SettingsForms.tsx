@@ -507,6 +507,21 @@ export function NotificationPrefsForm({ prefs, role }: {
           {pushUnavailableReason()}
         </AppText>
       )}
+      <AppText variant="small" bold>Публикации от X</AppText>
+      <AppText variant="caption" tone="muted">
+        Избери един или и двамата автори. Само нови преведени публикации, без стари постове и повторни преводи.
+      </AppText>
+      <Toggle label="Andrey Sizov" hint="@sizov_andre"
+        value={prefs.insightSizov ?? false} disabled={!prefs.enabled || update.isPending}
+        onChange={(insightSizov) => save({ insightSizov }, "Настройките са запазени.")} />
+      <Toggle label="Josh Linville" hint="@jlinvillefert"
+        value={prefs.insightLinville ?? false} disabled={!prefs.enabled || update.isPending}
+        onChange={(insightLinville) => save({ insightLinville }, "Настройките са запазени.")} />
+      <Toggle label="Важни развития на пазара на торове"
+        hint="Само подбрани съществени развития от FertilizerWeek."
+        value={prefs.insightFertilizerWeek ?? false} disabled={!prefs.enabled || update.isPending}
+        onChange={(insightFertilizerWeek) => save({ insightFertilizerWeek }, "Настройките са запазени.")} />
+      <Divider />
       <AppText variant="small" bold>Цени</AppText>
       <Toggle
         label="Актуализации на цените"

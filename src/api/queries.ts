@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { api } from "@/api/client";
+import { api, ApiClientError } from "@/api/client";
 import {
   authResultSchema,
   checkoutSchema,
@@ -19,6 +19,8 @@ import {
   invoicesSchema,
   listingDetailSchema,
   marketResponseSchema,
+  marketInsightSchema,
+  marketInsightsSchema,
   meSchema,
   newsArticleSchema,
   newsListSchema,
@@ -36,6 +38,7 @@ import {
   weatherResponseSchema,
   wasdeSummarySchema,
   weeklyBriefingSchema,
+  weeklyMarketReportSchema,
   type PriceRow,
   type CropQuality,
   logisticsListSchema,
@@ -56,6 +59,8 @@ export const keys = {
   home: ["home"] as const,
   weather: ["weather"] as const,
   market: ["market"] as const,
+  marketInsights: (query: string) => ["marketInsights", query] as const,
+  marketInsight: (id: string) => ["marketInsight", id] as const,
   crop: (slug: string, days = 30) => ["crop", slug, days] as const,
   cropAll: (slug: string) => ["crop", slug] as const,
   priceAlerts: (slug: string) => ["priceAlerts", slug] as const,
@@ -71,6 +76,7 @@ export const keys = {
   regions: ["regions"] as const,
   daily: ["briefing", "daily"] as const,
   weekly: ["briefing", "weekly"] as const,
+  weeklyMarketReport: ["weeklyMarketReport"] as const,
   wasde: ["wasde"] as const,
   logistics: (query: string, page: number) => ["logistics", "list", query, page] as const,
   logisticsFacility: (id: string) => ["logistics", "facility", id] as const,
@@ -87,6 +93,28 @@ function untilMidnight() {
 const ok = z.object({}).passthrough();
 
 /* ------------------------------------------------------------------ reads */
+
+export const useWeeklyMarketReport = () =>
+  useQuery({
+    queryKey: keys.weeklyMarketReport,
+    queryFn: ({ signal }) => api("/market-insights/weekly?includeFertilizerWeek=true", { schema: weeklyMarketReportSchema, signal }),
+    staleTime: 0, gcTime: 0, meta: { persist: false },
+  });
+
+export const useMarketInsights = (query: string) =>
+  useQuery({
+    queryKey: keys.marketInsights(query),
+    queryFn: ({ signal }) => api(`/market-insights?${query}`, { schema: marketInsightsSchema, signal }),
+    staleTime: 0, gcTime: 0, meta: { persist: false },
+  });
+
+export const useMarketInsight = (id: string | undefined) =>
+  useQuery({
+    queryKey: keys.marketInsight(id ?? ""),
+    queryFn: ({ signal }) => api(`/market-insights/${encodeURIComponent(id!)}`, { schema: marketInsightSchema, signal }),
+    enabled: !!id, staleTime: 0, gcTime: 0, meta: { persist: false },
+    refetchInterval: (query) => query.state.data?.translationPending ? 15_000 : false,
+  });
 
 export const useLogistics = (query: string, page: number, enabled = true) =>
   useQuery({
@@ -318,12 +346,19 @@ export const useUpdateRegion = () =>
 
 export const useUpdatePrefs = () =>
   useInvalidating(
-    (input: Partial<z.infer<typeof notificationPrefsSchema>>) =>
-      api("/me/notification-prefs", {
+    async (input: Partial<z.infer<typeof notificationPrefsSchema>>) => {
+      const prefs = await api("/me/notification-prefs", {
         method: "PATCH",
         body: input,
         schema: notificationPrefsSchema,
-      }),
+      });
+      for (const key of ["insightSizov", "insightLinville", "insightFertilizerWeek"] as const) {
+        if (input[key] !== undefined && prefs[key] !== input[key]) {
+          throw new ApiClientError("bad_response", "Настройката за автора не е запазена. Необходим е обновен API.");
+        }
+      }
+      return prefs;
+    },
     (client) => void client.invalidateQueries({ queryKey: keys.me }),
   );
 

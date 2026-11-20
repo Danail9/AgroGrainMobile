@@ -7,6 +7,7 @@ import type { PriceRow as PriceRowData } from "@/api/schemas";
 import { formatShortDate, relativeTime } from "@/lib/format";
 import { colors, radius, space } from "@/theme/tokens";
 import { FertilizerMarket } from "@/ui/FertilizerMarket";
+import { FertilizerMarketOverview } from "@/ui/FertilizerIntelligence";
 import { Icon, type IconName } from "@/ui/Icon";
 import { PriceRow } from "@/ui/PriceRow";
 import { favoritesFirst } from "@/lib/favorites";
@@ -101,7 +102,10 @@ export default function MarketScreen() {
       <QueryBoundary query={market}>
         {(data) =>
           section === "fertilizer" ? (
-            <FertilizerMarket offers={data.fertilizers} />
+            <View style={{ gap: space.lg }}>
+              <FertilizerMarketOverview />
+              <FertilizerMarket offers={data.fertilizers} />
+            </View>
           ) : (
             <Grain data={data} favorites={me.data?.favoriteCrops ?? []} />
           )

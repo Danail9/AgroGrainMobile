@@ -51,6 +51,8 @@ export default function AiScreen() {
       </Pressable>)}
       </View>)}
     </View>
+    <Button title="Пазарни анализи от източници" variant="secondary" icon="newspaper-outline"
+      onPress={() => router.push("/ai/insights")} />
     <QueryBoundary query={weather} stamp={false}>{(data) => <Card style={{ gap: space.sm }}>
       <AppText bold>Условия днес · {data.weather.regionName}</AppText>
       <AppText variant="caption" tone="muted">{updatedAgo(weather.dataUpdatedAt)} · последно получаване на данните</AppText>

@@ -44,6 +44,8 @@ describe("notification settings", () => {
     ["Ниски температури", "frost"],
     ["Силен вятър", "strongWind"],
     ["Подходящи дни за работа", "goodFieldWork"],
+    ["Andrey Sizov", "insightSizov"],
+    ["Josh Linville", "insightLinville"],
   ])("saves only the %s category", async (label, key) => {
     await render(<NotificationPrefsForm prefs={prefs} role={key === "newListing" ? "TRADER" : "FARMER"} />);
     for (const enabled of [false, true]) {
@@ -60,6 +62,22 @@ describe("notification settings", () => {
     expect(screen.getByLabelText("Всички известия").props.disabled).toBe(false);
     await fireEvent(screen.getByLabelText("Всички известия"), "valueChange", true);
     expect(mockMutate).toHaveBeenCalledWith({ enabled: true }, expect.any(Object));
+  });
+
+  it("defaults both authors to off for older API responses", async () => {
+    await render(<NotificationPrefsForm prefs={prefs} role="FARMER" />);
+    expect(screen.getByLabelText("Andrey Sizov").props.value).toBe(false);
+    expect(screen.getByLabelText("Josh Linville").props.value).toBe(false);
+  });
+
+  it("keeps author choices independent and pauses both under the master switch", async () => {
+    await render(<NotificationPrefsForm prefs={{
+      ...prefs, enabled: false, insightSizov: true, insightLinville: false,
+    }} role="FARMER" />);
+    expect(screen.getByLabelText("Andrey Sizov").props.value).toBe(true);
+    expect(screen.getByLabelText("Josh Linville").props.value).toBe(false);
+    expect(screen.getByLabelText("Andrey Sizov").props.disabled).toBe(true);
+    expect(screen.getByLabelText("Josh Linville").props.disabled).toBe(true);
   });
 
   it("shows a save error instead of reporting success", async () => {

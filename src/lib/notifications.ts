@@ -15,6 +15,7 @@ export function internalPath(url: string | null): string | null {
 }
 
 export const NOTIFICATION_ICONS = {
+  NEW_MARKET_INSIGHT: "newspaper",
   SUBSCRIPTION_UPGRADED: "checkmark-circle",
   SUBSCRIPTION_REMINDER: "calendar",
   SUBSCRIPTION_EXPIRED: "alert-circle",

@@ -6,6 +6,119 @@ Bulgarian copy. Design: [docs/superpowers/specs](docs/superpowers/specs/2026-10-
 What was actually built and what is left: [docs/implementation-notes.md](docs/implementation-notes.md).
 Use Node.js 26.12.1, pinned in [.nvmrc](.nvmrc) and the EAS build profiles.
 
+### Market Insights
+
+The News tab shows the weekly market report, recent X Market Insights,
+FertilizerWeek market news, then USDA WASDE. Fertilizer cards show product
+badges, publication dates, a short source summary, an excerpt of the AI
+interpretation, and a cautious direction indicator. Each card opens the complete
+analysis, where the original X post and any authorized image are shown; they
+are not Bulgarian price quotations. An image may include the source's forecasts.
+The all/nitrogen/phosphate filters use the backend `fertilizerGroup` filter
+before pagination. Deploy the FertilizerWeek backend and worker before the app;
+older APIs that ignore the filter can return an incomplete filtered list.
+The Bulgarian **Седмичен пазарен обзор** expands inline into developments,
+grain, fertilizers, possible Bulgarian implications, and a watchlist. Source
+references are retained by the backend but the mobile report does not display
+post counts, numbered citations, or the source list. Missing sections and overdue
+X checks are noted. It is an unverified, limited sample, not a local price forecast.
+
+`GET /api/v1/market-insights/weekly` only reads the saved report; opening News
+or refreshing never generates AI content. Reports cover the previous completed
+Monday–Sunday **UTC** week. The backend worker generates at most one paid
+attempt per period using the existing shared OpenAI budget, without additional
+X fetches or changes to the five-per-author daily limit. It prefers eligible
+saved originals and needs at least two posts. When there aren't enough originals,
+it can use saved approved Bulgarian AI translations and labels the report accordingly.
+The UI shows pending/failed/withdrawn and network errors without inventing a report
+or displaying stale content after an error. Query data is not persisted offline.
+Pull-to-refresh includes the weekly report alongside the two author feeds and WASDE.
+
+Deploy backend migration `20261117180000_weekly_market_report` (and the earlier
+original-storage migration), API, and worker before releasing the mobile update.
+The card requires the new endpoint; an older API produces an explicit load error.
+This report is separate from the existing region-based weekly AI briefing.
+
+The individual-post preview fetches the two latest eligible Andrey Sizov posts and one latest
+Josh Linville post separately, so a busy author cannot crowd out the other.
+Both authors are named in the heading. If one has no eligible posts, their
+slots are left unfilled with an explicit availability notice.
+The ordinary news article feed and category tabs are not shown there. The X
+feed is filtered server-side before pagination and the AgroGrain AI tab still
+links to the general paginated insights feed and detail view. Deploy the backend
+platform filter with the app: older APIs ignore it, so client-side source checks
+may leave pages incomplete until the backend is updated.
+The backend returns only approved, accessible insights; translations appear only
+when the source permissions allow them. The detail view distinguishes AI
+interpretation from the translated source, summary and verified evidence, and
+links to the original post. Posts without a saved translation or the required
+translation/republication permissions are hidden before API pagination; the
+client also hides untranslated items from older APIs and guards direct links.
+The feed requires the backend migrations, API and
+configured intelligence worker.
+Saved insights remain available regardless of publication age or an overdue
+source check. The backend no longer deletes them after 30 days. Posts awaiting
+an X availability recheck carry a warning and the last-check date when known
+in the News feed, archive, analysis and translated-post screens. Deleted,
+withdrawn, rejected and rights-revoked items remain hidden. Deploy the updated
+backend to restore saved posts hidden by the old 23-hour freshness filter;
+previously deleted records cannot be restored by a mobile update.
+The analysis screen shows a translation excerpt of up to 320 characters
+(shortened at a word boundary). Longer posts have a “Виж целия пост” button
+opening a dedicated reader with the unmodified translation, larger type and no
+line limit. Short translations appear in full without the redundant button.
+Both screens offer pull-to-refresh.
+The archive keeps filters collapsed by default, displays active filters with a
+clear action, and uses compact three-line summaries. Previous/next pagination
+is available above and below the results, with a current-page indicator.
+Changing pages returns to the top; applying or clearing filters resets to page
+one. Controls respect the API's `hasMore` flag and are disabled while fetching.
+The archive displays at most five posts per screen, dividing each 20-item API
+batch into four navigable pages. It requests `pageSize=20` and
+`includeFilters=true`, so the five-post display limit also works with older
+APIs that ignore `pageSize`. All batch items remain reachable before fetching
+the next batch. With all authors selected in the X archive, it also requests
+`authorMix=balanced`: each five-post page has three Andrey posts and two Josh
+posts, filling any unavailable author's spaces from the other author. Selecting
+one author removes the mixed ordering; crop filters still apply to both authors.
+Deploy the updated API to enable server-side mixed pagination without skipping
+older posts; older APIs ignore the parameter and remain chronological.
+Deploy the updated backend to return crop and author choices
+from eligible published posts across all pages. The archive offers only
+**Култура** and **Автор**, using wrapping selectable buttons with an all/reset
+choice for each group. Search appears for groups with more than eight choices.
+Older APIs use choices from the current page with an explicit notice until
+upgraded. Selecting a choice uses the saved tag rather than the
+search input. Other API clients retain the default 20-item page size.
+Josh's `jlinvillefert` source name is displayed as **Josh Linville** in cards,
+post screens and author filters, while filter requests retain the original value.
+The translated-post screen is read-only: it neither offers a translation-request
+button nor requests translations automatically. Translation is handled by the
+backend worker before a post becomes visible. Refreshing only retrieves the
+saved backend result. A saved translation is not proof of AI completeness.
+
+### New-post notifications
+
+Open **Известия за автори** in the archive, or **Профил → Известия**.
+Independent switches for Andrey Sizov and Josh Linville (`@jlinvillefert`)
+default to off; enable either or both. The master notification preference
+pauses both without clearing the choices. Phone delivery additionally requires
+**Известия на телефона**, OS permission, and a registered push-capable build.
+Tapping an alert opens the full translated post.
+
+Deploy backend migration `20261116120000_insight_notifications` and the updated
+API/worker, then release/reload the mobile update. The API must persist and
+return the new preferences; older APIs produce a save error rather than false
+success. Alerts are queued only on first publication of an eligible translation
+with a post ID newer than the source's last successfully committed cursor.
+Initial source imports, older backfills and retranslations do not alert.
+Recipients are captured at publication and rechecked for author/global opt-in,
+access and publication permissions before delivery. No alert backlog is sent
+when a user first opts in. In-app alerts are deduplicated and stored atomically
+with queue acknowledgement. Push uses the existing delivery service, with one
+attempt per stored alert; delivery is best effort, and a process interruption
+after acknowledgement can leave an in-app alert without a push.
+
 ## Run it on your phone (QR code, Expo Go)
 
 1. Install **Expo Go** from the App Store or Google Play.

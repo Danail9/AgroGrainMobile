@@ -121,6 +121,7 @@ async function main() {
   }
 
   const news = await check("GET /news", "/news", s.newsListSchema, token);
+  await check("GET /market-insights/weekly", "/market-insights/weekly", s.weeklyMarketReportSchema, token);
   const article = news?.items[0]?.slug;
   if (article) await check(`GET /news/${article}`, `/news/${article}`, s.newsArticleSchema, token);
 

@@ -21,6 +21,9 @@ export const ROLE_LABELS: Record<Role, string> = {
 /** The alert switches this role sees in settings, read with their defaults. */
 export function notificationSwitches(prefs: Prefs, role: Role) {
   const switches: boolean[] = [
+    prefs.insightSizov ?? false,
+    prefs.insightLinville ?? false,
+    prefs.insightFertilizerWeek ?? false,
     prefs.priceMove,
     prefs.priceTarget ?? true,
     prefs.heavyRain,
