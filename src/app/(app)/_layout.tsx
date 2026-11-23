@@ -1,5 +1,5 @@
 import { Stack } from "expo-router";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppState, View } from "react-native";
 
 
@@ -15,6 +15,8 @@ import { ErrorState, Loading } from "@/ui/QueryBoundary";
 import { InAppNotifications } from "@/ui/InAppNotifications";
 import { identifyUser } from "@/lib/monitoring";
 import { useAppleBillingSync } from "@/lib/useAppleBillingSync";
+import { BiometricOffer } from "@/ui/BiometricLock";
+import { NewsNotificationWelcome } from "@/ui/NewsNotificationWelcome";
 
 export const unstable_settings = { initialRouteName: "(tabs)" };
 
@@ -25,6 +27,8 @@ export const unstable_settings = { initialRouteName: "(tabs)" };
  */
 export default function AppLayout() {
   const me = useMe();
+  const [pushReady, setPushReady] = useState(false);
+  const handlePushReady = useCallback(() => setPushReady(true), []);
   useAppleBillingSync(me.data?.user.id, me.data?.user.role);
   const userId = me.data?.user.id;
   const userNumber = me.data?.user.number;
@@ -99,6 +103,9 @@ export default function AppLayout() {
   }
 
   const { user, subscription } = me.data;
+  const newsPromptPending = me.data.notificationPrefs.newsPromptPending === true;
+  const onboarding = newsPromptPending ? <NewsNotificationWelcome /> :
+    (!subscription.active || !me.data.notificationPrefs.push || pushReady ? <BiometricOffer /> : null);
 
   if (user.role === "ADMIN") {
     return (
@@ -113,13 +120,16 @@ export default function AppLayout() {
 
   if (!subscription.active) {
     return (
-      <Paywall
-        role={user.role}
-        subscription={subscription}
-        checking={me.isFetching}
-        onRefresh={() => void me.refetch()}
-        actions={<SignOutButton />}
-      />
+      <>
+        <Paywall
+          role={user.role}
+          subscription={subscription}
+          checking={me.isFetching}
+          onRefresh={() => void me.refetch()}
+          actions={<SignOutButton />}
+        />
+        {onboarding}
+      </>
     );
   }
 
@@ -127,10 +137,11 @@ export default function AppLayout() {
     <InAppNotifications key={user.id} userId={user.id} masterEnabled={me.data.notificationPrefs.enabled}>
       <UpdateBanner />
       <ActivityTracker />
-      <PushRegistrar enabled={me.data.notificationPrefs.push} />
+      <PushRegistrar enabled={me.data.notificationPrefs.push && !newsPromptPending} onReady={handlePushReady} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
         <Stack.Screen name="(tabs)" />
       </Stack>
+      {onboarding}
     </InAppNotifications>
   );
 }

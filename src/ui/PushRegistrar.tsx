@@ -8,7 +8,7 @@ import { reportError } from "@/lib/monitoring";
  * Keeps this phone registered for push while the account wants it, and opens
  * the screen a tapped alert points to. Report failures without blocking use.
  */
-export function PushRegistrar({ enabled }: { enabled: boolean }) {
+export function PushRegistrar({ enabled, onReady }: { enabled: boolean; onReady?: () => void }) {
   useEffect(() => {
     let stop: (() => void) | undefined;
     let cancelled = false;
@@ -27,8 +27,12 @@ export function PushRegistrar({ enabled }: { enabled: boolean }) {
   }, []);
 
   useEffect(() => {
-    if (enabled) void enablePush().catch((error) => reportError("Push notification registration failed", error));
-  }, [enabled]);
+    if (enabled) {
+      void enablePush()
+        .catch((error) => reportError("Push notification registration failed", error))
+        .finally(() => onReady?.());
+    }
+  }, [enabled, onReady]);
 
   return null;
 }

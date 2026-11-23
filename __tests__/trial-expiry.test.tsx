@@ -1,9 +1,10 @@
-import { act, render } from "@testing-library/react-native";
+import { act, render, screen } from "@testing-library/react-native";
 
 import AppLayout from "@/app/(app)/_layout";
 
 const mockRefetch = jest.fn();
 let mockTrialActive = true;
+let mockNewsPromptPending = false;
 const deadline = "2026-02-28T10:15:00Z";
 jest.mock("@/api/queries", () => ({
   useMe: () => ({
@@ -11,7 +12,7 @@ jest.mock("@/api/queries", () => ({
     data: {
       user: { id: "trader-1", role: "TRADER" },
       subscription: { active: true, trialActive: mockTrialActive, trialEndsAt: deadline },
-      notificationPrefs: { enabled: true, push: true },
+      notificationPrefs: { enabled: true, push: true, newsPromptPending: mockNewsPromptPending },
     },
   }),
 }));
@@ -19,7 +20,19 @@ jest.mock("expo-router", () => ({ Stack: () => null }));
 jest.mock("@/ui/Gate", () => ({ Gate: () => null, SignOutButton: () => null }));
 jest.mock("@/ui/ActivityTracker", () => ({ ActivityTracker: () => null }));
 jest.mock("@/ui/UpdateBanner", () => ({ UpdateBanner: () => null }));
-jest.mock("@/ui/PushRegistrar", () => ({ PushRegistrar: () => null }));
+jest.mock("@/ui/PushRegistrar", () => ({
+  PushRegistrar: ({ enabled }: { enabled: boolean }) => {
+    const { Text } = require("react-native");
+    return <Text>{enabled ? "push-ready-to-register" : "push-deferred"}</Text>;
+  },
+}));
+jest.mock("@/ui/BiometricLock", () => ({ BiometricOffer: () => null }));
+jest.mock("@/ui/NewsNotificationWelcome", () => ({
+  NewsNotificationWelcome: () => {
+    const { Text } = require("react-native");
+    return <Text>news-welcome</Text>;
+  },
+}));
 jest.mock("@/ui/Paywall", () => ({ Paywall: () => null }));
 jest.mock("@/lib/useAppleBillingSync", () => ({ useAppleBillingSync: jest.fn() }));
 jest.mock("@/ui/QueryBoundary", () => ({ ErrorState: () => null, Loading: () => null }));
@@ -32,6 +45,18 @@ beforeEach(() => {
   jest.setSystemTime(new Date("2026-01-31T10:15:00Z"));
   mockRefetch.mockReset().mockResolvedValue({});
   mockTrialActive = true;
+  mockNewsPromptPending = false;
+});
+
+it("defers device push permission until the new user has made their news choice", async () => {
+  mockNewsPromptPending = true;
+  const view = await render(<AppLayout />);
+  expect(screen.getByText("news-welcome")).toBeTruthy();
+  expect(screen.getByText("push-deferred")).toBeTruthy();
+  mockNewsPromptPending = false;
+  await view.rerender(<AppLayout />);
+  expect(screen.queryByText("news-welcome")).toBeNull();
+  expect(screen.getByText("push-ready-to-register")).toBeTruthy();
 });
 afterEach(() => jest.useRealTimers());
 

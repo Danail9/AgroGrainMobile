@@ -104,6 +104,8 @@ export const notificationPrefsSchema = z.object({
   insightSizov: z.boolean().optional(),
   insightLinville: z.boolean().optional(),
   insightFertilizerWeek: z.boolean().optional(),
+  news: z.boolean().optional(),
+  newsPromptPending: z.boolean().optional(),
   newOffer: z.boolean(),
   newListing: z.boolean(),
   subscriptionUpgrade: z.boolean(),

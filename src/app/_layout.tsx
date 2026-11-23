@@ -15,7 +15,7 @@ import { wrapRoot } from "@/lib/monitoring";
 import { isUnsupported } from "@/lib/version";
 import { colors } from "@/theme/tokens";
 import { DialogHost } from "@/ui/Dialog";
-import { BiometricBoundary, BiometricOffer } from "@/ui/BiometricLock";
+import { BiometricBoundary } from "@/ui/BiometricLock";
 import { Button } from "@/ui/forms";
 import { GATE_COPY, Gate } from "@/ui/Gate";
 import { AppOpenTracker } from "@/ui/AppOpenTracker";
@@ -91,7 +91,6 @@ function RootLayout() {
             <BiometricSession>
               <Navigator />
               <DialogHost />
-              <BiometricOffer />
             </BiometricSession>
           </BillingProvider>
         </AuthProvider>

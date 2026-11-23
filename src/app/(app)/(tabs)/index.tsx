@@ -356,25 +356,25 @@ function TraderView({ data, favorites, now }: { data: TraderHome; favorites: str
 
   return (
     <>
-      <View style={{ flexDirection: "row", gap: 8 }}>
+      <View style={{ gap: space.sm }}>
+        <View style={{ flexDirection: "row", gap: space.sm }}>
+          <StatCard
+            value={formatNumber(data.stats.activeOffers)}
+            label="Моите активни оферти"
+            onPress={() => router.push("/trade?tab=mine")}
+          />
+          <StatCard
+            value={formatNumber(data.stats.openListings)}
+            label="Обяви от фермери"
+            onPress={() => router.push("/trade?tab=listings")}
+          />
+        </View>
         <StatCard
-          icon="pricetag"
-          value={formatNumber(data.stats.activeOffers)}
-          label="Мои оферти"
-          onPress={() => router.push("/trade?tab=mine")}
-        />
-        <StatCard
-          icon="cube"
-          value={formatNumber(data.stats.openListings)}
-          label="Обяви от фермери"
-          onPress={() => router.push("/trade?tab=listings")}
-        />
-        <StatCard
-          icon="layers"
           value={formatNumber(data.stats.totalTonnage)}
           unit="т"
-          label="Предлагани"
+          label="Общо количество в обявите от фермери"
           onPress={() => router.push("/trade?tab=listings")}
+          horizontal
         />
       </View>
 
@@ -399,14 +399,16 @@ function TraderView({ data, favorites, now }: { data: TraderHome; favorites: str
         </Pressable>
       ) : null}
 
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        <QuickAction icon="add-circle" label="Нова оферта" onPress={() => router.push("/trade?tab=offers")} />
-        <QuickAction icon="stats-chart" label="Пазарен обзор" onPress={() => router.push("/ai/market")} />
-        <QuickAction icon="calculator" label="Калкулатор" onPress={() => router.push("/ai/calculator")} />
+      <View style={{ gap: space.sm }}>
+        <QuickAction icon="add-circle" label="Нова оферта" primary onPress={() => router.push("/trade?tab=offers")} />
+        <View style={{ flexDirection: "row", gap: space.sm }}>
+          <QuickAction icon="stats-chart" label="Пазарен обзор" onPress={() => router.push("/ai/market")} />
+          <QuickAction icon="calculator" label="Калкулатор" onPress={() => router.push("/ai/calculator")} />
+        </View>
       </View>
 
       <View>
-        <SectionHeader title="Нови обяви от фермери" action="Всички" href="/trade?tab=listings" />
+        <SectionHeader title="Последни обяви от фермери" action="Всички" href="/trade?tab=listings" />
         {data.latestListings.length ? (
           <RowList>
             {data.latestListings.map((listing, index) => {
@@ -423,21 +425,12 @@ function TraderView({ data, favorites, now }: { data: TraderHome; favorites: str
                     <View style={styles.emoji}>
                       <AppText style={{ fontSize: 20 }}>{row?.emoji ?? "🌾"}</AppText>
                     </View>
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <View style={{ flexDirection: "row", gap: space.sm }}>
-                        <AppText variant="small" bold numberOfLines={1} style={{ flex: 1 }}>
-                          {listing.title}
-                        </AppText>
-                        <AppText variant="small" bold numeric>
-                          {formatNumber(listing.quantityT)} т
-                        </AppText>
-                      </View>
-                      <AppText variant="caption" tone="muted" numberOfLines={1}>
-                        {listing.farmer?.farmName || listing.farmer?.name || "Фермер"} ·{" "}
-                        {relativeTime(new Date(listing.createdAt), new Date(now))}
-                      </AppText>
+                    <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+                      <AppText variant="small" bold>{listing.title}</AppText>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                        <AppText variant="caption" bold numeric>
+                        <AppText variant="small" bold numeric>{formatNumber(listing.quantityT)} т</AppText>
+                        <AppText variant="caption" tone="muted">·</AppText>
+                        <AppText variant="small" bold numeric>
                           {listing.askPrice ? formatPrice(listing.askPrice, listing.unit) : "Цена по договаряне"}
                         </AppText>
                         {delta !== null && Math.abs(delta) >= 0.5 ? (
@@ -447,6 +440,10 @@ function TraderView({ data, favorites, now }: { data: TraderHome; favorites: str
                           </AppText>
                         ) : null}
                       </View>
+                      <AppText variant="caption" tone="muted">
+                        {listing.farmer?.farmName || listing.farmer?.name || "Фермер"} ·{" "}
+                        {relativeTime(new Date(listing.createdAt), new Date(now))}
+                      </AppText>
                       {specsLine(listing) ? (
                         <AppText variant="caption" tone="muted" numberOfLines={1}>
                           {specsLine(listing)}
@@ -471,7 +468,11 @@ function TraderView({ data, favorites, now }: { data: TraderHome; favorites: str
 
       <View>
         <SectionHeader title="Пазарни цени" action="Виж всички" href="/market" />
-        <RowList>
+        {prices.length ? <RowList>
+          <AppText variant="caption" tone="muted" style={styles.priceNote}>
+            Дати на публикуваните цени
+          </AppText>
+          <Divider />
           {prices.map((price, index) => (
             <View key={price.slug}>
               {index > 0 ? <Divider /> : null}
@@ -481,10 +482,13 @@ function TraderView({ data, favorites, now }: { data: TraderHome; favorites: str
                 compact
                 fullUnit
                 favorite={favorites.includes(price.slug)}
+                showDate
               />
             </View>
           ))}
-        </RowList>
+        </RowList> : (
+          <Card><AppText variant="small" tone="muted">Няма налични пазарни цени.</AppText></Card>
+        )}
       </View>
     </>
   );
@@ -505,28 +509,26 @@ function specsLine(listing: { hectolitre: number | null; protein: number | null;
 }
 
 function StatCard({
-  icon,
   value,
   unit,
   label,
   onPress,
+  horizontal = false,
 }: {
-  icon: IconName;
   value: string;
   unit?: string;
   label: string;
   onPress: () => void;
+  horizontal?: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${label}: ${value}${unit ? ` ${unit}` : ""}`}
       onPress={onPress}
-      style={({ pressed }) => [styles.stat, pressed && pressedStyle]}
+      style={({ pressed }) => [styles.stat, horizontal && styles.statHorizontal, pressed && pressedStyle]}
     >
-      <View style={styles.statIcon}>
-        <Icon name={icon} size={16} color={colors.brand[600]} />
-      </View>
+      {horizontal ? <AppText variant="small" tone="muted" style={{ flex: 1 }}>{label}</AppText> : null}
       <AppText variant="title" numeric style={{ fontSize: 22 }}>
         {value}
         {unit ? (
@@ -536,22 +538,23 @@ function StatCard({
           </AppText>
         ) : null}
       </AppText>
-      <AppText variant="caption" tone="muted" numberOfLines={1}>
+      {!horizontal ? <AppText variant="small" tone="muted">
         {label}
-      </AppText>
+      </AppText> : null}
     </Pressable>
   );
 }
 
-function QuickAction({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+function QuickAction({ icon, label, onPress, primary = false }: { icon: IconName; label: string; onPress: () => void; primary?: boolean }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       onPress={onPress}
-      style={({ pressed }) => [styles.action, pressed && pressedStyle]}
+      style={({ pressed }) => [styles.action, primary && styles.primaryAction, pressed && pressedStyle]}
     >
-      <Icon name={icon} size={18} color={colors.brand[700]} />
-      <AppText variant="caption" bold numberOfLines={1} style={{ color: colors.brand[800] }}>
+      <Icon name={icon} size={18} color={primary ? colors.white : colors.brand[700]} />
+      <AppText variant="small" bold align="center" style={{ flexShrink: 1, color: primary ? colors.white : colors.brand[800] }}>
         {label}
       </AppText>
     </Pressable>
@@ -561,20 +564,19 @@ function QuickAction({ icon, label, onPress }: { icon: IconName; label: string; 
 const styles = StyleSheet.create({
   stat: {
     flex: 1,
-    gap: 4,
-    padding: 12,
+    minWidth: 0,
+    gap: 6,
+    padding: space.lg,
     borderRadius: radius.lg,
     backgroundColor: colors.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.line,
     ...shadowCard,
   },
-  statIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: colors.brand[50],
+  statHorizontal: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 2,
+    gap: space.md,
   },
   alert: {
     flexDirection: "row",
@@ -592,12 +594,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
+    minWidth: 0,
+    minHeight: 48,
+    paddingHorizontal: space.sm,
     paddingVertical: 12,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.brand[200],
-    backgroundColor: colors.brand[50],
+    backgroundColor: colors.white,
   },
+  primaryAction: { flex: 0, backgroundColor: colors.brand[700], borderColor: colors.brand[700] },
+  priceNote: { paddingHorizontal: space.lg, paddingVertical: space.md },
   listing: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.lg },
   emoji: {
     width: 40,

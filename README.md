@@ -394,19 +394,30 @@ notices, never assistant turns; retry resends the same question without duplicat
 or “Промени въпроса” restores it for editing. Requests are guarded against double
 submission. Conversations remain screen-local; persistence/streaming are not added.
 
-Weather offers a temporary oblast selector for forecasts and statistics together.
+The **Време** bottom tab is available to both farmers and traders. Weather
+offers a temporary oblast selector for forecasts and statistics together.
 It never edits the profile; “Регион от профила” restores the default.
 Selections last while the weather screen remains mounted. Data represents the
 oblast's configured weather point, not individual town/village measurements.
 The portal must support `GET /api/v1/weather?region=<slug>`. Queries are cached
 separately per region and never display another region's previous payload.
 
+Accounts newly registered in the mobile app have news notifications enabled and see a one-time
+choice to keep or disable them. The choice is saved on the account; older
+accounts retain their existing settings. Device push still requires OS
+permission and a configured development or store build. News and individual
+source preferences can be changed independently in notification settings.
+Weekly and USDA alerts require the backend migration and intelligence worker;
+USDA is checked periodically and its first observation establishes a baseline.
+
 The farmer homepage previews three favourite-first market prices and three
 trader offers, prioritizing the saved account region without filtering out
 other regions. Offer location is shown when available. Weather previews rain
 and wind; humidity remains on the weather screen. The daily overview previews
 one risk/tip/news insight, not repeated weather/prices, with full details linked.
-Empty offers show an explicit empty state. Trader dashboards are unchanged.
+Empty offers show an explicit empty state. The trader dashboard highlights its
+primary offer action, labels farmer listing totals, and shows each market quote's
+own date; the dashboard refresh time is not treated as the price date.
 Farmer market and offer previews end with full-width, explicit destination
 buttons (“Виж всички пазарни цени” and “Отвори борсата”), rather than small
 section-header links. The exchange action remains available for empty offers.

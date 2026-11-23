@@ -507,6 +507,15 @@ export function NotificationPrefsForm({ prefs, role }: {
           {pushUnavailableReason()}
         </AppText>
       )}
+      {prefs.news !== undefined ? (
+        <>
+          <Toggle label="Агро новини"
+            hint="Нови публикации, седмичен обзор и доклад на USDA. Настройките за отделните източници действат независимо."
+            value={prefs.news} disabled={!prefs.enabled || update.isPending}
+            onChange={(news) => save({ news }, "Настройките са запазени.")} />
+          <Divider />
+        </>
+      ) : null}
       <AppText variant="small" bold>Публикации от X</AppText>
       <AppText variant="caption" tone="muted">
         Избери един или и двамата автори. Само нови преведени публикации, без стари постове и повторни преводи.

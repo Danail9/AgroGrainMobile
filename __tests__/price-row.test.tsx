@@ -54,6 +54,13 @@ it("still supports older API responses without delivery metadata", async () => {
   expect(screen.queryByText(/Доставено/)).toBeNull();
 });
 
+it("shows the price date for older responses when requested", async () => {
+  const { portPrices: _ports, ...legacy } = price;
+  await render(<PriceRow price={legacy} showChange={false} showDate />);
+  expect(screen.getByText("20.10.2026")).toBeTruthy();
+  expect(screen.getByRole("button").props.accessibilityLabel).toContain("към 20.10.2026");
+});
+
 it("renders and routes malting barley using its own quotes, with data-based market summaries", async () => {
   const malting = {
     ...price, slug: "barley-malting", name: "Ечемик пивоварен",

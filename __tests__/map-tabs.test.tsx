@@ -25,10 +25,10 @@ it.each(["FARMER", "TRADER"])("exposes Карта and preserves existing tabs fo
   await render(<TabsLayout />);
   expect(screen.getByTestId("tab-map")).toHaveTextContent("Карта");
   for (const name of ["index", "market", "trade", "news", "ai"]) expect(screen.getByTestId(`tab-${name}`)).toBeTruthy();
-  expect(!!screen.queryByTestId("tab-weather")).toBe(role === "FARMER");
+  expect(screen.getByTestId("tab-weather")).toHaveTextContent("Време");
   expect(screen.getAllByTestId(/^tab-/).map((tab) => tab.props.testID)).toEqual(
     (role === "FARMER" ? ["index", "weather", "market", "trade", "news", "map", "ai"] :
-      ["index", "trade", "market", "news", "map", "ai"]).map((name) => `tab-${name}`),
+      ["index", "weather", "trade", "market", "news", "map", "ai"]).map((name) => `tab-${name}`),
   );
 });
 

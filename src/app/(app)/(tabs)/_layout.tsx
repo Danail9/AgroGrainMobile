@@ -20,7 +20,7 @@ const TAB: Record<string, TabDef> = {
 };
 
 const FARMER_TABS = [TAB.index, TAB.weather, TAB.market, TAB.trade, TAB.news, TAB.map, TAB.ai];
-const TRADER_TABS = [TAB.dashboard, TAB.trade, TAB.market, TAB.news, TAB.map, TAB.ai];
+const TRADER_TABS = [TAB.dashboard, TAB.weather, TAB.trade, TAB.market, TAB.news, TAB.map, TAB.ai];
 const ALL = ["index", "weather", "market", "trade", "news", "map", "ai"];
 
 export default function TabsLayout() {

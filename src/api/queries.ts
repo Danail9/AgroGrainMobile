@@ -41,6 +41,7 @@ import {
   weeklyMarketReportSchema,
   type PriceRow,
   type CropQuality,
+  type Me,
   logisticsListSchema,
   logisticsPublicFacilitySchema,
   logisticsMapSchema,
@@ -352,14 +353,17 @@ export const useUpdatePrefs = () =>
         body: input,
         schema: notificationPrefsSchema,
       });
-      for (const key of ["insightSizov", "insightLinville", "insightFertilizerWeek"] as const) {
+      for (const key of ["insightSizov", "insightLinville", "insightFertilizerWeek", "news", "newsPromptPending"] as const) {
         if (input[key] !== undefined && prefs[key] !== input[key]) {
           throw new ApiClientError("bad_response", "Настройката за автора не е запазена. Необходим е обновен API.");
         }
       }
       return prefs;
     },
-    (client) => void client.invalidateQueries({ queryKey: keys.me }),
+    (client, prefs) => {
+      client.setQueryData<Me>(keys.me, (me) => me ? { ...me, notificationPrefs: prefs } : me);
+      void client.invalidateQueries({ queryKey: keys.me });
+    },
   );
 
 /** Returns a fresh session: every other device is signed out, as on the web. */

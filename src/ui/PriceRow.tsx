@@ -4,7 +4,7 @@ import { Pressable, View } from "react-native";
 import type { z } from "zod";
 
 import type { priceRowSchema } from "@/api/schemas";
-import { formatNumber } from "@/lib/format";
+import { formatFullDate, formatNumber } from "@/lib/format";
 import { colors, space } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { pressedStyle, ChangeBadge } from "@/ui/primitives";
@@ -19,6 +19,7 @@ export function PriceRow({
   compact = false,
   fullUnit = false,
   favorite = false,
+  showDate = false,
 }: {
   price: PriceRowData;
   /** Reserve the change column only when at least one row can fill it. */
@@ -27,13 +28,14 @@ export function PriceRow({
   /** Show "€/т" instead of the short "€" used on the cramped home card. */
   fullUnit?: boolean;
   favorite?: boolean;
+  showDate?: boolean;
 }) {
   const description = price.portPrices
     ? (["VARNA", "BURGAS"] as const).map((destination) => {
       const quote = price.portPrices?.find((item) => item.destination === destination);
-      return `Доставено до пристанище ${destination === "VARNA" ? "Варна" : "Бургас"}: ${quote ? `${formatNumber(quote.price, 2)} евро на тон` : "Няма публикувана оферта"}`;
+      return `Доставено до пристанище ${destination === "VARNA" ? "Варна" : "Бургас"}: ${quote ? `${formatNumber(quote.price, 2)} евро на тон${showDate ? `, към ${formatFullDate(new Date(quote.date))}` : ""}` : "Няма публикувана оферта"}`;
     }).join("; ")
-    : `${formatNumber(price.price)} евро на тон${price.deliveryLabel ? `, ${price.deliveryLabel}` : ""}`;
+    : `${formatNumber(price.price)} евро на тон${price.deliveryLabel ? `, ${price.deliveryLabel}` : ""}${showDate ? `, към ${formatFullDate(new Date(price.date))}` : ""}`;
   return (
     <Pressable
       accessibilityRole="button"
@@ -78,16 +80,26 @@ export function PriceRow({
                     <AppText variant="caption" tone="muted" style={{ fontSize: 10 }}>{price.unit}</AppText>
                   </> : "—"}
                 </AppText>
+                {showDate && quote ? (
+                  <AppText variant="caption" tone="muted" align="right" style={{ fontSize: 10 }}>
+                    {formatFullDate(new Date(quote.date))}
+                  </AppText>
+                ) : null}
               </View>
             );
           })}
         </View>
-      ) : <AppText variant="body" numeric bold style={{ fontSize: 17 }}>
-        {formatNumber(price.price, price.delivery && price.delivery !== "NATIONAL" ? 2 : 0)}{" "}
-        <AppText variant="small" tone="muted" bold>
-          {price.unit === "€/т" && !fullUnit ? "€" : price.unit}
+      ) : <View style={{ alignItems: "flex-end", gap: 2 }}>
+        <AppText variant="body" numeric bold style={{ fontSize: 17 }}>
+          {formatNumber(price.price, price.delivery && price.delivery !== "NATIONAL" ? 2 : 0)}{" "}
+          <AppText variant="small" tone="muted" bold>
+            {price.unit === "€/т" && !fullUnit ? "€" : price.unit}
+          </AppText>
         </AppText>
-      </AppText>}
+        {showDate ? (
+          <AppText variant="caption" tone="muted">{formatFullDate(new Date(price.date))}</AppText>
+        ) : null}
+      </View>}
       {showChange && !price.portPrices ? (
         <View style={{ width: 84, alignItems: "flex-end" }}>
           <ChangeBadge value={price.changePct} variant="plain" />
